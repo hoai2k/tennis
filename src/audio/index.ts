@@ -25,10 +25,33 @@ export function createAudio(initial: GameSettings): AudioApi {
   let musicVolume = clamp01(initial.musicVolume);
   let sfxVolume = clamp01(initial.sfxVolume);
 
-  const music = new MusicManager(musicVolume);
+  // Two independent reasons to go silent: the user's mute button, and the
+  // tab being in the background. Either one ducks everything to zero while
+  // the underlying volume settings are preserved.
+  let userMuted = !!initial.muted;
+  let pageHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+  const gateOpen = (): boolean => !userMuted && !pageHidden;
+
+  const music = new MusicManager(gateOpen() ? musicVolume : 0);
 
   let ctx: AudioContext | null = null;
   let engine: SfxEngine | null = null;
+
+  function applyGate(): void {
+    const f = gateOpen() ? 1 : 0;
+    music.setVolume(musicVolume * f);
+    engine?.setVolume(sfxVolume * f);
+    if (!gateOpen()) engine?.chargeLoop(false);
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      pageHidden = document.visibilityState === 'hidden';
+      applyGate();
+    });
+    // some browsers background a tab without a visibility change
+    window.addEventListener('blur', () => { if (document.hidden) { pageHidden = true; applyGate(); } });
+  }
 
   function unlock(): void {
     if (!ctx) {
@@ -37,7 +60,7 @@ export function createAudio(initial: GameSettings): AudioApi {
       if (AC) {
         try {
           ctx = new AC();
-          engine = new SfxEngine(ctx, sfxVolume);
+          engine = new SfxEngine(ctx, gateOpen() ? sfxVolume : 0);
         } catch {
           ctx = null;
           engine = null;
@@ -68,12 +91,12 @@ export function createAudio(initial: GameSettings): AudioApi {
 
     setMusicVolume(v: number): void {
       musicVolume = clamp01(v);
-      music.setVolume(musicVolume);
+      music.setVolume(gateOpen() ? musicVolume : 0);
     },
 
     setSfxVolume(v: number): void {
       sfxVolume = clamp01(v);
-      engine?.setVolume(sfxVolume);
+      engine?.setVolume(gateOpen() ? sfxVolume : 0);
     },
 
     getMusicVolume(): number {
@@ -82,6 +105,15 @@ export function createAudio(initial: GameSettings): AudioApi {
 
     getSfxVolume(): number {
       return sfxVolume;
+    },
+
+    setMuted(m: boolean): void {
+      userMuted = !!m;
+      applyGate();
+    },
+
+    isMuted(): boolean {
+      return userMuted;
     },
   };
 }

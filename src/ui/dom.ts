@@ -94,7 +94,7 @@ export function starSVG(size: number, color = '#ffd42a', cls = ''): string {
 }
 
 /** Crisp icons for the persistent corner buttons. */
-export function iconSVG(kind: 'fullscreen' | 'help' | 'gear'): string {
+export function iconSVG(kind: 'fullscreen' | 'help' | 'gear' | 'sound' | 'muted'): string {
   const common = 'width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"';
   switch (kind) {
     case 'fullscreen':
@@ -107,6 +107,17 @@ export function iconSVG(kind: 'fullscreen' | 'help' | 'gear'): string {
         <circle cx="12" cy="12" r="9.5"/>
         <path d="M9.2 9.4 a2.9 2.9 0 1 1 4.3 2.6 c-1 .6 -1.5 1.1 -1.5 2.2"/>
         <circle cx="12" cy="17.4" r="0.6" fill="currentColor" stroke="none"/>
+      </svg>`;
+    case 'sound':
+      return `<svg ${common} aria-hidden="true">
+        <path d="M4 9.5 h3.2 L12 5.6 v12.8 L7.2 14.5 H4 z"/>
+        <path d="M15.6 9.2 a4 4 0 0 1 0 5.6"/>
+        <path d="M18.2 6.6 a7.6 7.6 0 0 1 0 10.8"/>
+      </svg>`;
+    case 'muted':
+      return `<svg ${common} aria-hidden="true">
+        <path d="M4 9.5 h3.2 L12 5.6 v12.8 L7.2 14.5 H4 z"/>
+        <path d="M16.2 9.8 l5 4.4"/><path d="M21.2 9.8 l-5 4.4"/>
       </svg>`;
     case 'gear':
       return `<svg ${common} aria-hidden="true">

@@ -87,6 +87,8 @@ function clamp01(v: number): number {
 
 export function createUI(root: HTMLElement, cb: UiCallbacks, initial: GameSettings): UiApi {
   const settings = loadSettings(initial);
+  // assigned once the corner buttons exist; keeps the speaker icon in step
+  let syncCornerMute: () => void = () => { /* no-op until wired */ };
 
   // ---------------- layers ----------------
   const uiRoot = div('cc-ui');
@@ -116,6 +118,7 @@ export function createUI(root: HTMLElement, cb: UiCallbacks, initial: GameSettin
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
       } catch { /* ignore */ }
       cb.onSettingsChanged({ ...settings });
+      syncCornerMute();
     },
   };
 
@@ -208,27 +211,37 @@ export function createUI(root: HTMLElement, cb: UiCallbacks, initial: GameSettin
   }
 
   // ---------------- loading overlay ----------------
+  // A slim bar along the bottom: it never dims the scene and never covers
+  // or blocks the corner buttons (pointer-events stay off entirely).
   const loadingEl = div('cc-loading');
   loadingEl.hidden = true;
+  const loadingBall = div('cc-loading-ball');
+  loadingBall.innerHTML = ballSVG(26, 'cc-loading-ball-svg');
+  loadingEl.appendChild(loadingBall);
   const loadingCard = div('cc-loading-card');
   loadingCard.appendChild(div('cc-loading-title', 'ENTERING THE COURT'));
   const loadingTrack = div('cc-loading-track');
   const loadingFill = div('cc-loading-fill');
   loadingTrack.appendChild(loadingFill);
   loadingCard.appendChild(loadingTrack);
-  const loadingLabel = div('cc-loading-label', 'Loading\u2026');
-  loadingCard.appendChild(loadingLabel);
-  const loadingBall = div('cc-loading-ball');
-  loadingBall.innerHTML = ballSVG(46, 'cc-loading-ball-svg');
-  loadingCard.appendChild(loadingBall);
   loadingEl.appendChild(loadingCard);
+  const loadingLabel = div('cc-loading-label', 'Loading\u2026');
+  loadingEl.appendChild(loadingLabel);
   uiRoot.appendChild(loadingEl);
 
   // ---------------- persistent corner buttons ----------------
-  uiRoot.appendChild(createCornerButtons({
+  const corner = createCornerButtons({
     openInstructions: () => openModal('instructions'),
     openSettings: () => openModal('settings'),
-  }));
+    isMuted: () => settings.muted,
+    toggleMute: () => {
+      settings.muted = !settings.muted;
+      ctx.commitSettings();
+      if (!settings.muted) ctx.sfx('menu_move'); // audible confirmation
+    },
+  });
+  uiRoot.appendChild(corner.el);
+  syncCornerMute = corner.syncMute;
 
   // ---------------- api ----------------
   const api: UiApi = {

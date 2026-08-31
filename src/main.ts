@@ -90,6 +90,7 @@ const ui: UiApi = createUI(uiRoot, {
   onSettingsChanged(s) {
     audio.setMusicVolume(s.musicVolume);
     audio.setSfxVolume(s.sfxVolume);
+    audio.setMuted(s.muted);
   },
 }, DEFAULT_SETTINGS);
 
@@ -97,6 +98,7 @@ const ui: UiApi = createUI(uiRoot, {
   const s = ui.getSettings();
   audio.setMusicVolume(s.musicVolume);
   audio.setSfxVolume(s.sfxVolume);
+  audio.setMuted(s.muted);
 }
 
 input.onMenuAction((action, pad) => {
@@ -132,13 +134,70 @@ function slotsKey(slots: { characterId: CharacterId }[]): string {
   return slots.map((s) => s.characterId).join('|');
 }
 
+/** no bytes and no completion for this long ⇒ the request is wedged */
+const LOAD_STALL_MS = Number(new URLSearchParams(location.search).get('stallMs') ?? 20000);
+/** grace before the first progress event (slow links, or no content-length) */
+const LOAD_FIRST_BYTE_MS = Number(new URLSearchParams(location.search).get('firstByteMs') ?? 30000);
+/** absolute ceiling on a whole match load, however it fails */
+const LOAD_WATCHDOG_MS = Number(new URLSearchParams(location.search).get('watchdogMs') ?? 90000);
+
+/**
+ * loadAvatar that cannot hang forever. A stalled network request otherwise
+ * leaves the loading bar sitting at a fixed percentage with nothing to
+ * recover it, so treat "no progress for a while" as a failure and retry once.
+ */
+function loadAvatarResilient(
+  def: ReturnType<typeof characterById>,
+  onProgress: (f: number) => void,
+): Promise<Avatar> {
+  const attempt = (url: string): Promise<Avatar> => new Promise<Avatar>((resolve, reject) => {
+    let timer = 0;
+    let settled = false;
+    const arm = (ms: number): void => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error(`stalled loading ${def.model}`));
+      }, ms);
+    };
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      fn();
+    };
+    arm(LOAD_FIRST_BYTE_MS);
+    loadAvatar({ ...def, model: url }, (f) => {
+      if (settled) return;
+      // Once the bytes are down, the remaining work is CPU-bound parsing and
+      // rig setup, which emits no progress — a stall timer would misfire on a
+      // slow device. Only the watchdog bounds that phase.
+      if (f >= 1) window.clearTimeout(timer);
+      else arm(LOAD_STALL_MS);
+      onProgress(f);
+    }).then(
+      (av) => finish(() => resolve(av)),
+      (err) => finish(() => reject(err)),
+    );
+  });
+
+  return attempt(def.model).catch((err) => {
+    console.warn('retrying character load', def.id, err);
+    onProgress(0);
+    // three's FileLoader de-dupes by URL and will happily attach to the
+    // request that just wedged, so the retry needs a distinct URL
+    return attempt(`${def.model}?retry=${Date.now()}`);
+  });
+}
+
 function beginPrefetch(slots: { characterId: CharacterId }[]): Prefetch {
   const defs = slots.map((s) => characterById(s.characterId));
   const fracs = defs.map(() => 0);
   const done = defs.map(() => false);
   const promise = Promise.all(
     defs.map((d, i) =>
-      loadAvatar(d, (f) => { fracs[i] = f; }).then((a) => {
+      loadAvatarResilient(d, (f) => { fracs[i] = f; }).then((a) => {
         fracs[i] = 1;
         done[i] = true;
         return a;
@@ -170,53 +229,74 @@ function buildSetup(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHumans: bo
   return { mode: chosenMode, players, court: theme.id, gamesToWin };
 }
 
+/** guards against a second PLAY press starting a parallel load */
+let loadInFlight = false;
+
+function abortToCourtSelect(msg: string): void {
+  ui.hideLoading();
+  prefetch = null;
+  state = 'court';
+  const humans = pendingSlots.filter((sl) => sl.control !== 'ai').length;
+  ui.showCourtSelect(themeDefs(), chosenMode === 'doubles' && humans >= 2);
+  ui.announce(msg, 'big', 2600);
+}
+
 async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHumans: boolean): Promise<void> {
+  if (loadInFlight) return; // ignore a double confirm
+  loadInFlight = true;
   state = 'loading';
   ui.hideAll();
   ui.showLoading();
-  const setup = buildSetup(theme, gamesToWin, splitHumans);
 
-  // rebuild stadium for the chosen theme (cheap: ~30ms)
-  scene.remove(stadium.group);
-  stadium.dispose();
-  stadium = createStadium(theme.id, ui.getSettings().crowdDensity);
-  scene.add(stadium.group);
+  const tick = window.setInterval(() => {
+    if (prefetch) ui.setLoadingProgress(prefetchProgress(prefetch) * 0.97);
+  }, 80);
+  // Nothing below may leave the game wedged on the loading bar: the whole
+  // body is guarded, with a watchdog for anything that never settles at all.
+  let watchdog = 0;
+  const watchdogFired = new Promise<never>((_, reject) => {
+    watchdog = window.setTimeout(
+      () => reject(new Error('load watchdog timeout')),
+      LOAD_WATCHDOG_MS,
+    );
+  });
 
-  const key = slotsKey(setup.players);
-  const job = prefetch && prefetch.key === key ? prefetch : beginPrefetch(setup.players);
-  const tick = window.setInterval(
-    () => ui.setLoadingProgress(prefetchProgress(job) * 0.97),
-    80,
-  );
-  let avatars: Avatar[];
   try {
-    avatars = await job.promise;
-  } catch (err) {
-    window.clearInterval(tick);
-    console.error('failed to load characters', err);
+    const setup = buildSetup(theme, gamesToWin, splitHumans);
+
+    // rebuild stadium for the chosen theme (cheap: ~30ms)
+    scene.remove(stadium.group);
+    stadium.dispose();
+    stadium = createStadium(theme.id, ui.getSettings().crowdDensity);
+    scene.add(stadium.group);
+
+    const key = slotsKey(setup.players);
+    const job = prefetch && prefetch.key === key ? prefetch : beginPrefetch(setup.players);
+    const avatars = await Promise.race([job.promise, watchdogFired]);
+
+    prefetch = null; // these instances are now owned by the match
+    ui.setLoadingProgress(1, 'READY!');
+
+    match = new MatchController(setup, avatars, theme, { audio, ui, input, stadium });
+    scene.add(match.group);
+    match.onEnd = (result: MatchResult) => {
+      state = 'victory';
+      audio.setMusic('victory');
+      ui.showVictory(result);
+    };
+
+    state = 'match';
+    audio.setMusic('gameplay');
     ui.hideLoading();
-    prefetch = null;
-    state = 'menu';
-    ui.showMainMenu();
-    ui.announce('LOAD FAILED — TRY AGAIN', 'big', 2600);
-    return;
+    ui.showMatchHud([match.teamInfo(0), match.teamInfo(1)]);
+  } catch (err) {
+    console.error('failed to start match', err);
+    abortToCourtSelect('COULDN\u2019T LOAD — TRY AGAIN');
+  } finally {
+    window.clearInterval(tick);
+    window.clearTimeout(watchdog);
+    loadInFlight = false;
   }
-  window.clearInterval(tick);
-  prefetch = null; // these instances are now owned by the match
-  ui.setLoadingProgress(1, 'READY!');
-
-  match = new MatchController(setup, avatars, theme, { audio, ui, input, stadium });
-  scene.add(match.group);
-  match.onEnd = (result: MatchResult) => {
-    state = 'victory';
-    audio.setMusic('victory');
-    ui.showVictory(result);
-  };
-
-  state = 'match';
-  audio.setMusic('gameplay');
-  ui.hideLoading();
-  ui.showMatchHud([match.teamInfo(0), match.teamInfo(1)]);
 }
 
 function endMatch(): void {

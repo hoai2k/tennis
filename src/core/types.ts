@@ -219,6 +219,9 @@ export interface AudioApi {
   setSfxVolume(v: number): void;
   getMusicVolume(): number;
   getSfxVolume(): number;
+  /** user-facing mute toggle (independent of the automatic tab-hidden duck) */
+  setMuted(muted: boolean): void;
+  isMuted(): boolean;
 }
 
 // ---------- World / stadium ----------
@@ -237,6 +240,8 @@ export interface StadiumApi {
 export interface GameSettings {
   musicVolume: number; // 0..1
   sfxVolume: number;   // 0..1
+  /** user mute toggle (corner button); volumes are preserved underneath */
+  muted: boolean;
   rumble: boolean;
   crowdDensity: 'full' | 'light';
 }
@@ -244,6 +249,7 @@ export interface GameSettings {
 export const DEFAULT_SETTINGS: GameSettings = {
   musicVolume: 0.7,
   sfxVolume: 0.9,
+  muted: false,
   rumble: true,
   crowdDensity: 'full',
 };

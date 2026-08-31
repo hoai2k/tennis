@@ -1348,46 +1348,55 @@
 }
 
 /* ---------------------------------------------------------------- */
-/* Loading overlay with progress bar                                 */
+/* Loading bar — bottom strip, never blocks the scene or the buttons */
 /* ---------------------------------------------------------------- */
 
 .cc-loading {
   position: absolute;
-  inset: 0;
+  left: 18px;
+  bottom: 18px;
+  /* stop short of the four corner buttons so nothing is covered */
+  right: 268px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: radial-gradient(ellipse at center, rgba(42, 18, 74, 0.72) 0%, rgba(12, 6, 26, 0.9) 100%);
-  z-index: 60;
+  gap: 12px;
+  padding: 9px 16px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(42, 21, 80, 0.86) 0%, rgba(21, 11, 44, 0.9) 100%);
+  border: 3px solid var(--cc-yellow);
+  box-shadow: 0 4px 0 rgba(10, 5, 20, 0.5), 0 0 26px rgba(159, 79, 240, 0.35);
+  /* purely informational: clicks pass straight through to the game */
+  pointer-events: none;
+  z-index: 45;
+  animation: cc-loading-in 0.25s ease-out;
+}
+@keyframes cc-loading-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .cc-loading-card {
-  position: relative;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 30px 54px 34px;
-  border-radius: 24px;
-  background: linear-gradient(180deg, #2a1550 0%, #1b0e38 100%);
-  border: 4px solid var(--cc-yellow);
-  box-shadow: 0 8px 0 rgba(10, 5, 20, 0.55), 0 0 46px rgba(159, 79, 240, 0.45);
-  min-width: min(520px, 78vw);
+  gap: 5px;
+  min-width: 0;
 }
 .cc-loading-title {
-  font-size: clamp(18px, 3vh, 28px);
+  font-size: clamp(11px, 1.5vh, 14px);
   font-weight: 900;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   color: var(--cc-white);
-  -webkit-text-stroke: 2px var(--cc-ink);
-  paint-order: stroke fill;
-  text-shadow: 0 4px 0 rgba(20, 10, 40, 0.5);
+  text-shadow: 0 2px 0 rgba(20, 10, 40, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .cc-loading-track {
   width: 100%;
-  height: 22px;
+  height: 12px;
   border-radius: 999px;
-  background: rgba(10, 5, 22, 0.75);
-  border: 3px solid rgba(255, 255, 255, 0.22);
+  background: rgba(10, 5, 22, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.22);
   overflow: hidden;
 }
 .cc-loading-fill {
@@ -1395,20 +1404,33 @@
   width: 0%;
   border-radius: 999px;
   background: linear-gradient(90deg, #3ecf5a 0%, #d8e83c 55%, #ffd42a 100%);
-  box-shadow: 0 0 16px rgba(216, 232, 60, 0.65);
+  box-shadow: 0 0 12px rgba(216, 232, 60, 0.6);
   transition: width 0.25s ease-out;
 }
 .cc-loading-label {
-  font-size: clamp(13px, 1.9vh, 17px);
+  flex: 0 0 auto;
+  font-size: clamp(11px, 1.6vh, 14px);
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: #ffe9a8;
+  min-width: 42px;
+  text-align: right;
 }
 .cc-loading-ball {
-  position: absolute;
-  right: -14px;
-  top: -18px;
+  flex: 0 0 auto;
+  display: flex;
   animation: cc-loading-spin 1.5s linear infinite;
-  filter: drop-shadow(0 3px 0 rgba(20, 10, 40, 0.5));
+  filter: drop-shadow(0 2px 0 rgba(20, 10, 40, 0.5));
 }
 @keyframes cc-loading-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 700px) {
+  /* corner buttons wrap to a tighter cluster on small screens */
+  .cc-loading { right: 18px; bottom: 74px; }
+}
+
+/* muted state for the sound corner button */
+.cc-corner-btn.cc-corner-off {
+  color: #ff8f8f;
+  border-color: rgba(255, 143, 143, 0.55);
+}
