@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cursed Court — Character Viewer</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: transparent; font-family: monospace; }
+      #view { display: inline-block; line-height: 0; }
+      #info { color: #dde; padding: 4px 8px; font-size: 12px; min-height: 16px; }
+      #buttons { padding: 4px; max-width: 1200px; }
+      #buttons button {
+        margin: 2px; padding: 3px 7px; font-size: 11px; font-family: monospace;
+        background: #333a46; color: #dde; border: 1px solid #555; border-radius: 4px; cursor: pointer;
+      }
+      #buttons button:hover { background: #4a5364; }
+    </style>
+  </head>
+  <body>
+    <div id="view"></div>
+    <div id="info"></div>
+    <div id="buttons"></div>
+    <script type="module" src="/src/characters/devViewer.ts"></script>
+  </body>
+</html>

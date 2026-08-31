@@ -44,6 +44,13 @@ export function createVictoryScreen(ctx: UiCtx): VictoryApi {
   root.appendChild(confetti);
 
   const center = div('cc-victory-center');
+  // generated golden burst slowly spinning behind the winner card
+  const burst = el('img', 'cc-victory-burst') as HTMLImageElement;
+  burst.alt = '';
+  burst.src = 'images/victory-burst.png';
+  burst.addEventListener('load', () => burst.classList.add('cc-img-ready'));
+  burst.addEventListener('error', () => burst.remove());
+  center.appendChild(burst);
   const heading = div('cc-victory-heading', 'GAME, SET & MATCH!');
   center.appendChild(heading);
 

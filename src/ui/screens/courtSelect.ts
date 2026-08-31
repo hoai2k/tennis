@@ -39,9 +39,16 @@ const FALLBACK_LOOK: CourtLook = {
   blurb: 'Exhibition court',
 };
 
-function courtPreview(look: CourtLook): HTMLElement {
+function courtPreview(look: CourtLook, themeId: string): HTMLElement {
   const p = div('cc-court-preview');
   p.style.background = look.sky;
+  // generated preview art covers the CSS art when available
+  const img = el('img', 'cc-court-img') as HTMLImageElement;
+  img.alt = '';
+  img.src = `images/court-${themeId}.jpg`;
+  img.addEventListener('load', () => img.classList.add('cc-img-ready'));
+  img.addEventListener('error', () => img.remove());
+  p.appendChild(img);
   const apron = div('cc-court-apron');
   apron.style.background = look.apron;
   const surf = div('cc-court-surface');
@@ -113,7 +120,7 @@ export function createCourtSelect(ctx: UiCtx): CourtSelectApi {
     themes.forEach((t, i) => {
       const look = COURT_LOOKS[t.id] ?? FALLBACK_LOOK;
       const card = div('cc-court-card');
-      card.appendChild(courtPreview(look));
+      card.appendChild(courtPreview(look, t.id));
       card.appendChild(div('cc-court-name', t.name));
       card.appendChild(div('cc-court-blurb', look.blurb));
       card.addEventListener('click', () => {

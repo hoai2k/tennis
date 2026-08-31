@@ -1255,3 +1255,94 @@
   .cc-charsel-side { width: min(94vw, 560px); flex: 0 0 auto; }
   .cc-instr-tips { grid-template-columns: 1fr; }
 }
+
+/* ---------------------------------------------------------------- */
+/* Generated artwork (public/images/) — layered over CSS fallbacks   */
+/* ---------------------------------------------------------------- */
+
+.cc-title-bgimg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  pointer-events: none;
+}
+.cc-title-bgimg.cc-img-ready { opacity: 1; }
+/* darken art slightly so logo & PRESS START stay readable */
+.cc-title .cc-bg-stripes {
+  background:
+    linear-gradient(180deg, rgba(20, 8, 40, 0.35) 0%, rgba(20, 8, 40, 0.1) 35%, rgba(20, 8, 40, 0.45) 100%),
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.05) 0 46px, rgba(255, 255, 255, 0) 46px 92px);
+}
+
+.cc-logo-img {
+  display: none;
+  width: clamp(360px, 62vh, 760px);
+  max-width: 86vw;
+  height: auto;
+  filter: drop-shadow(0 10px 0 rgba(20, 10, 40, 0.45));
+  animation: cc-logo-bob 3.2s ease-in-out infinite;
+  z-index: 2;
+}
+@keyframes cc-logo-bob {
+  0%, 100% { transform: scale(1) rotate(-1deg); }
+  50% { transform: scale(1.035) rotate(1deg); }
+}
+.cc-logo-has-img .cc-logo-img { display: block; }
+.cc-logo-has-img .cc-logo-word { display: none; }
+.cc-logo-has-img .cc-logo-aura {
+  inset: -4% 4%;
+  background: radial-gradient(ellipse at center, rgba(159, 79, 240, 0.5) 0%, rgba(159, 79, 240, 0.18) 45%, transparent 70%);
+}
+
+.cc-court-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 3;
+}
+.cc-court-img.cc-img-ready { opacity: 1; }
+
+.cc-victory-burst {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: clamp(420px, 78vh, 900px);
+  height: auto;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  animation: cc-burst-spin 26s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.cc-victory-burst.cc-img-ready { opacity: 0.9; }
+@keyframes cc-burst-spin {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+.cc-victory-center > *:not(.cc-victory-burst) { position: relative; z-index: 1; }
+
+/* readability of press-prompts over bright generated art */
+.cc-title .cc-press-start,
+.cc-victory .cc-press-start {
+  background: rgba(18, 8, 38, 0.62);
+  border-radius: 999px;
+  padding: 10px 34px;
+  box-shadow: 0 3px 0 rgba(10, 5, 20, 0.5), 0 0 24px rgba(20, 8, 40, 0.5);
+  text-shadow: 0 2px 0 rgba(10, 5, 20, 0.9), 0 0 12px rgba(0, 0, 0, 0.6);
+  color: #fff;
+}
+/* gentler flash over artwork: pulse, never nearly-invisible */
+@keyframes cc-press-pulse { 50% { opacity: 0.55; transform: scale(0.985); } }
+.cc-title .cc-press-start,
+.cc-victory .cc-press-start {
+  animation: cc-press-pulse 1.15s ease-in-out infinite;
+}

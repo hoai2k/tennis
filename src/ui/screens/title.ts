@@ -30,6 +30,13 @@ function archedWord(word: string, cls: string, ballIndex = -1): HTMLElement {
 
 export function createTitleScreen(ctx: UiCtx): Screen {
   const root = div('cc-screen cc-title');
+  // generated stadium art behind the striped gradient (fades in when it loads)
+  const bgImg = el('img', 'cc-title-bgimg') as HTMLImageElement;
+  bgImg.alt = '';
+  bgImg.src = 'images/title-bg.jpg';
+  bgImg.addEventListener('load', () => bgImg.classList.add('cc-img-ready'));
+  bgImg.addEventListener('error', () => bgImg.remove());
+  root.appendChild(bgImg);
   root.appendChild(div('cc-bg-stripes'));
 
   const center = div('cc-title-center');
@@ -51,6 +58,13 @@ export function createTitleScreen(ctx: UiCtx): Screen {
   logo.appendChild(aura);
   logo.appendChild(archedWord('CURSED', 'cc-logo-cursed'));
   logo.appendChild(archedWord('COURT', 'cc-logo-court', 1)); // ball as the O
+  // generated logo art replaces the CSS lettering once it loads
+  const logoImg = el('img', 'cc-logo-img') as HTMLImageElement;
+  logoImg.alt = 'CURSED COURT';
+  logoImg.src = 'images/logo.png';
+  logoImg.addEventListener('load', () => logo.classList.add('cc-logo-has-img'));
+  logoImg.addEventListener('error', () => logoImg.remove());
+  logo.appendChild(logoImg);
   center.appendChild(logo);
 
   center.appendChild(div('cc-title-sub', 'a JJK × Mandalorian tennis showdown'));
