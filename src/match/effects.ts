@@ -33,7 +33,7 @@ class SpritePool {
       it.mesh.position.addScaledVector(it.vel, dt);
       it.vel.y -= 4 * dt;
       const f = it.life / it.maxLife;
-      (it.mesh.material as THREE.SpriteMaterial).opacity = f;
+      (it.mesh.material as THREE.SpriteMaterial).opacity = f * 0.72;
       if (it.grow) it.mesh.scale.addScalar(it.grow * dt);
     }
   }
@@ -78,7 +78,7 @@ export class MatchFx {
 
   constructor() {
     const tex = circleTexture();
-    this.sparks = new SpritePool(this.group, tex, 24, 0xffee66, 0.5);
+    this.sparks = new SpritePool(this.group, tex, 24, 0xffee66, 0.3);
     this.puffs = new SpritePool(this.group, tex, 16, 0xffffff, 0.35);
 
     // chance-shot star marker: gold star + pulsing ring lying on the court
@@ -102,13 +102,16 @@ export class MatchFx {
   }
 
   hitSpark(pos: THREE.Vector3, color: number, big: boolean): void {
-    const n = big ? 10 : 5;
+    // Kept deliberately small and short-lived: the ball leaves the racquet
+    // through this burst, and a big bloom hides exactly the thing the player
+    // needs to track.
+    const n = big ? 7 : 4;
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
-      const v = new THREE.Vector3(Math.cos(a) * 3, Math.random() * 3 + 1, Math.sin(a) * 3);
-      this.sparks.spawn(pos, v, big ? 0.5 : 0.3, color, big ? 1.5 : 0);
+      const v = new THREE.Vector3(Math.cos(a) * 2.6, Math.random() * 2.4 + 0.8, Math.sin(a) * 2.6);
+      this.sparks.spawn(pos, v, big ? 0.26 : 0.16, color, big ? 0.5 : 0);
     }
-    if (big) this.shake = Math.max(this.shake, 0.5);
+    if (big) this.shake = Math.max(this.shake, 0.34);
   }
 
   bouncePuff(pos: THREE.Vector3): void {

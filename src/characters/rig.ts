@@ -218,6 +218,41 @@ export class Rig {
     // start from root: root is identity → char space == world at capture time
     computeCanon(root, new THREE.Quaternion());
 
+    // ---- symmetrize the LEG bind positions ----
+    // Rotations are canonicalized above, but bone *offsets* keep whatever the
+    // model was bound in. Several models are bound mid-stride or slightly
+    // knock-kneed (yuji's legs sit one-forward-one-back, maki's thighs splay
+    // inward), and no amount of rotation fixes an asymmetric skeleton. Mirror
+    // each left/right pair about the character's X axis and average them, so
+    // every rig starts from a symmetric stance.
+    const mirrorPairs: [BoneKey, BoneKey][] = [
+      ['thighL', 'thighR'], ['shinL', 'shinR'],
+      ['footL', 'footR'], ['toeL', 'toeR'],
+    ];
+    const symTmpL = new THREE.Vector3();
+    const symTmpR = new THREE.Vector3();
+    const symQ = new THREE.Quaternion();
+    const symmetrize = (bl: THREE.Object3D | undefined, br: THREE.Object3D | undefined): void => {
+      if (!bl || !br || !bl.parent || !br.parent) return;
+      const pcL = canonOf.get(bl.parent);
+      const pcR = canonOf.get(br.parent);
+      if (!pcL || !pcR) return;
+      // into character space
+      symTmpL.copy(bl.position).applyQuaternion(pcL);
+      symTmpR.copy(br.position).applyQuaternion(pcR);
+      symTmpR.x = -symTmpR.x;                    // mirror right onto left
+      symTmpL.add(symTmpR).multiplyScalar(0.5);  // average the pair
+      // back to each parent's local space
+      br.position.copy(symTmpL).setX(-symTmpL.x).applyQuaternion(symQ.copy(pcR).invert());
+      bl.position.copy(symTmpL).applyQuaternion(symQ.copy(pcL).invert());
+    };
+    for (const [kl, kr] of mirrorPairs) symmetrize(get(kl), get(kr));
+    symmetrize(byName.get('DEF-pelvisL'), byName.get('DEF-pelvisR'));
+    // leg twist segments follow the same treatment
+    for (const stem of ['thigh', 'shin']) {
+      symmetrize(byName.get(`DEF-${stem}L001`), byName.get(`DEF-${stem}R001`));
+    }
+
     const addRec = (bone: THREE.Object3D, k: BoneKey | null) => {
       if (!bone.parent) return;
       const parentCanon = canonOf.get(bone.parent) ?? new THREE.Quaternion();

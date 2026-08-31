@@ -24,14 +24,14 @@ const LEAP_EXTRA_HEIGHT = 0.95;
  *  1.73m body, per kind+side); the magnet subtracts this to find where the
  *  FEET belong for clean contact */
 const CONTACT_OFFSET: Record<string, { x: number; z: number }> = {
-  topspin_fore: { x: -0.82, z: 0.83 }, topspin_back: { x: 0.63, z: 0.20 },
-  slice_fore: { x: -0.79, z: 0.83 },   slice_back: { x: 0.64, z: 0.30 },
-  flat_fore: { x: -0.81, z: 0.83 },    flat_back: { x: 0.65, z: 0.22 },
-  lob_fore: { x: -0.73, z: 0.86 },     lob_back: { x: 0.67, z: 0.34 },
-  drop_fore: { x: -0.86, z: 0.63 },    drop_back: { x: 0.60, z: 0.09 },
-  star_fore: { x: -0.81, z: 0.83 },    star_back: { x: 0.65, z: 0.22 },
-  smash_fore: { x: -0.81, z: 0.83 },   smash_back: { x: 0.65, z: 0.22 },
-  overhead: { x: 0.23, z: 0.52 },
+  topspin_fore: { x: -1.03, z: 1.01 }, topspin_back: { x: 0.83, z: 0.17 },
+  slice_fore: { x: -1.00, z: 1.02 },   slice_back: { x: 0.84, z: 0.31 },
+  flat_fore: { x: -1.03, z: 1.02 },    flat_back: { x: 0.85, z: 0.21 },
+  lob_fore: { x: -0.92, z: 1.08 },     lob_back: { x: 0.89, z: 0.37 },
+  drop_fore: { x: -1.07, z: 0.76 },    drop_back: { x: 0.76, z: 0.04 },
+  star_fore: { x: -1.02, z: 1.02 },    star_back: { x: 0.85, z: 0.21 },
+  smash_fore: { x: -1.03, z: 1.02 },   smash_back: { x: 0.85, z: 0.21 },
+  overhead: { x: 0.32, z: 0.60 },
 };
 
 /** look-ahead used to decide when to swing (seconds) */
@@ -72,6 +72,7 @@ export class MatchController {
   private pointWinner: 0 | 1 = 0;
   private starConsumedBy: Actor | null = null;
   private _contactTmp = new THREE.Vector3();
+  private _focus: THREE.Vector3[] = [];
   private _samples: THREE.Vector3[] = Array.from({ length: 12 }, () => new THREE.Vector3());
   /** tuning counters (read by the dev harness) */
   readonly stats = { swings: 0, lunges: 0, leaps: 0, rallies: [] as number[], endings: [] as string[], faults: 0 };
@@ -320,6 +321,7 @@ export class MatchController {
     this.deps.audio.chargeLoop(false);
     for (const a of this.actors) {
       a.cancelCharge();
+      a.avatar.setGlow(0);
       a.intent.moveX = 0; a.intent.moveZ = 0; a.intent.shotPressed = '';
     }
     this.excitement = Math.min(1, 0.5 + this.rallyHits * 0.06);
@@ -438,7 +440,7 @@ export class MatchController {
     const off = swingSide === 'overhead'
       ? CONTACT_OFFSET.overhead
       : CONTACT_OFFSET[`${kind}_${swingSide}`] ?? CONTACT_OFFSET.topspin_fore;
-    const hScale = actor.avatar.def.height / 1.73;
+    const hScale = actor.avatar.def.height / 1.989; // calibration body height
     // rotate the character-local offset into world space (yaw π for team 0)
     const f = actor.team === 0 ? -1 : 1;
     const worldOffX = off.x * hScale * f;
@@ -458,6 +460,7 @@ export class MatchController {
     if ((needLunge || needLeap) && glide > stand) actor.pad?.rumble(0.2, 0.5, 90);
 
     actor.avatar.swing({ side: swingSide, kind, power: charge, contactHeight: contact.y });
+    actor.avatar.setGlow(0);
     actor.cancelCharge();
     actor.swingLock = 0.55;
     this.deps.audio.chargeLoop(false);
@@ -657,6 +660,14 @@ export class MatchController {
     p.y = 0;
   }
 
+  private onDash(actor: Actor): void {
+    this.deps.audio.sfx('whiff', { gain: 0.35, rate: 1.4 });
+    this.deps.audio.chargeLoop(false);
+    actor.avatar.setGlow(0);
+    actor.pad?.rumble(0.5, 0.25, 110);
+    this.fx.hitSpark(actor.pos, new THREE.Color(actor.avatar.def.color).getHex(), false);
+  }
+
   private driveFormationDuringServe(): void {
     for (const a of this.actors) {
       if (a === this.server) continue;
@@ -712,10 +723,22 @@ export class MatchController {
         a.intent.aimX = a.pad.moveX;
         a.intent.aimY = -a.pad.moveY * (a.team === 0 ? 1 : -1); // push toward far side = deeper
       }
-      // cancel charge if our own team just hit (ball heading away)
-      if (a.charging && this.ball.active && this.lastHitTeam === a.team) {
+      // Only drop a wind-up the player is no longer holding; while the button
+      // is down the coiled pose is exactly the feedback they asked for.
+      if (a.charging && a.chargeBtn && !a.pad.held(a.chargeBtn)) {
         a.cancelCharge();
+        a.avatar.setGlow(0);
         this.deps.audio.chargeLoop(false);
+      }
+
+      // visible wind-up feedback: the character glows brighter as it charges
+      if (a.charging) a.avatar.setGlow(0.14 + a.charge * 0.56);
+
+      // LB dash — in the direction of travel, or armed until a direction comes
+      if (a.pad.pressed('lb')) {
+        if (a.startDash(a.pad.moveX, a.pad.moveY)) this.onDash(a);
+      } else if (a.dashArmed > 0 && Math.hypot(a.pad.moveX, a.pad.moveY) > 0.35) {
+        if (a.startDash(a.pad.moveX, a.pad.moveY)) this.onDash(a);
       }
     }
   }
@@ -735,7 +758,11 @@ export class MatchController {
       }
       if (btn) {
         if (a.charging) a.comboPress(btn);
-        else if (this.lastHitTeam !== a.team && a.swingLock <= 0) {
+        // A human who presses gets a wind-up immediately, even if the ball is
+        // still on the far side — pressing and seeing nothing happen is the
+        // single most confusing thing the controls can do. The swing simply
+        // will not connect until the ball is theirs to hit.
+        else if ((a.isHuman || this.lastHitTeam !== a.team) && a.swingLock <= 0) {
           const side = a.sideForBallX(this.ball.pos.x);
           a.beginCharge(btn, side);
           if (a.isHuman) this.deps.audio.chargeLoop(true);
@@ -743,12 +770,39 @@ export class MatchController {
       }
       if (a.charging || btn) this.tryExecuteHit(a);
       else if (this.lastHitTeam !== a.team) this.tryAutoSwing(a);
+
+      // Releasing the button always resolves the wind-up: if the ball never
+      // came, swing through anyway rather than freezing in the coiled pose.
+      if (a.isHuman && a.pad && a.charging && a.chargeBtn && a.pad.released(a.chargeBtn)) {
+        this.whiffSwing(a);
+      }
     }
+  }
+
+  /** swing through empty air and return to the ready stance */
+  private whiffSwing(actor: Actor): void {
+    const side = actor.chargeSide;
+    const kind = actor.chargeKind;
+    const power = actor.charge;
+    actor.avatar.swing({ side, kind, power });
+    actor.avatar.setGlow(0);
+    actor.cancelCharge();
+    actor.swingLock = 0.42;
+    this.deps.audio.chargeLoop(false);
+    this.deps.audio.sfx('whiff', { gain: 0.5 });
   }
 
   /** tiny mercy: if ball is about to pass a non-charging human within easy
    *  reach, do nothing (they must press). AI always charges via brain. */
   private tryAutoSwing(_a: Actor): void {}
+
+  /** everything the camera must keep on screen: the ball and every player */
+  focusPoints(): THREE.Vector3[] {
+    this._focus.length = 0;
+    for (const a of this.actors) this._focus.push(a.pos);
+    this._focus.push(this.ball.pos);
+    return this._focus;
+  }
 
   /** debug/testing accessors */
 

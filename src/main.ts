@@ -319,7 +319,7 @@ function frame(now: number): void {
   if (state === 'match' || state === 'victory') {
     match?.update(dt);
     stadium.update(dt, match ? match.excitement : 0.6);
-    if (match) matchCam.update(dt, match.ball.pos, match.fx.shake);
+    if (match) matchCam.update(dt, match.ball.pos, match.fx.shake, match.focusPoints());
   } else {
     idleT += dt;
     stadium.update(dt, 0.25);
@@ -340,6 +340,7 @@ const params = new URLSearchParams(location.search);
   get state() { return state; },
   get match() { return match; },
   ui, input, audio,
+  get camera() { return matchCam.camera; },
   /** advance the simulation synchronously (headless testing — rendering
    *  still happens on the next rAF) */
   fastForward(seconds: number) {

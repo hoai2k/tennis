@@ -183,13 +183,20 @@ class AvatarImpl implements Avatar {
 
 /** measured racquet height at the contact frame / body height, per shot */
 const NOMINAL_CONTACT_FRAC: Record<string, number> = {
-  topspin_fore: 0.59, topspin_back: 0.50,
-  slice_fore: 0.75, slice_back: 0.57,
-  flat_fore: 0.64, flat_back: 0.53,
-  lob_fore: 0.66, lob_back: 0.56,
-  drop_fore: 0.75, drop_back: 0.57,
-  star_fore: 0.64, star_back: 0.53,
-  smash_fore: 0.64, smash_back: 0.53,
+  topspin_fore: 0.523,
+  topspin_back: 0.488,
+  slice_fore: 0.578,
+  slice_back: 0.503,
+  flat_fore: 0.543,
+  flat_back: 0.498,
+  lob_fore: 0.568,
+  lob_back: 0.523,
+  drop_fore: 0.578,
+  drop_back: 0.503,
+  star_fore: 0.543,
+  star_back: 0.498,
+  smash_fore: 0.543,
+  smash_back: 0.498,
 };
 
 export async function loadAvatar(

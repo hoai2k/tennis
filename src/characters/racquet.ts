@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 
 /* ============================================================
- * Procedural cartoon tennis racquet (~0.68 m long).
+ * Procedural cartoon tennis racquet.
+ * Mario Tennis exaggerates the racquet much more than the body — the head
+ * reads roughly torso-sized — so ours is scaled well past a real 0.68m frame
+ * to match the (already oversized) ball.
  * Built along +Y: grip at origin, head tip at +0.68.
  * String plane faces ±Z. `headCenter` marks the sweet spot.
  * ============================================================ */
@@ -12,9 +15,11 @@ export interface Racquet {
   dispose(): void;
 }
 
-const LEN = 0.68;
-const HEAD_RX = 0.115; // head half-width
-const HEAD_RY = 0.145; // head half-height
+export const RACQUET_SCALE = 1.4;
+
+const LEN = 0.68 * RACQUET_SCALE;
+const HEAD_RX = 0.115 * RACQUET_SCALE; // head half-width
+const HEAD_RY = 0.145 * RACQUET_SCALE; // head half-height
 const HEAD_CY = LEN - HEAD_RY - 0.01; // head center height
 
 function stringsTexture(): THREE.CanvasTexture {

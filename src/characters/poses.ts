@@ -157,18 +157,22 @@ export const SPECS: Record<string, PoseSpec> = {
   },
 
   ready: {
+    // Athletic tennis ready position: racquet held UP in front of the body,
+    // knees softly bent rather than deeply folded. The old stance crouched
+    // 34/46 degrees at hip/knee, which read as a knock-kneed "Z" kink on
+    // slimmer characters, and let the racquet hang down by the shins.
     bones: {
-      hips: [10, 0, 0], spine1: [9, 0, 0], spine2: [7, 0, 0], spine3: [3, 0, 0],
-      neck1: [-8, 0, 0], head: [-14, 0, 0],
-      shoulderL: [0, 0, 4], shoulderR: [0, 0, -4],
-      upperArmL: [-24, -10, 16], upperArmR: [-24, 10, -16],
-      forearmL: [-42, -18, 4], forearmR: [-42, 18, -4],
-      handL: [-10, 0, 8], handR: [-38, -25, -10],
-      thighL: [-34, 0, 10], thighR: [-34, 0, -10],
-      shinL: [46, 0, 0], shinR: [46, 0, 0],
-      footL: [-13, 0, -6], footR: [-13, 0, 6],
+      hips: [8, 0, 0], spine1: [7, 0, 0], spine2: [6, 0, 0], spine3: [3, 0, 0],
+      neck1: [-7, 0, 0], head: [-12, 0, 0],
+      shoulderL: [0, 0, 6], shoulderR: [0, 0, -6],
+      upperArmL: [-40, -14, 14], upperArmR: [-44, 14, -14],
+      forearmL: [-60, -20, 6], forearmR: [-62, 20, -6],
+      handL: [-8, 0, 10], handR: [-16, -12, -8],
+      thighL: [-23, 0, 6], thighR: [-23, 0, -6],
+      shinL: [32, 0, 0], shinR: [32, 0, 0],
+      footL: [-9, 0, -4], footR: [-9, 0, 4],
     },
-    hip: [0, -0.13, 0],
+    hip: [0, -0.09, 0],
   },
 
   runLean: {

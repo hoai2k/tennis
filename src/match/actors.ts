@@ -16,6 +16,12 @@ export interface ActorIntent {
 }
 
 const COMBO_WINDOW = 0.24;
+/** LB dash tuning */
+const DASH_TIME = 0.20;
+const DASH_COOLDOWN = 0.7;
+const DASH_SPEED_MUL = 1.9;
+/** how long an LB press stays armed waiting for a direction */
+const DASH_ARM_WINDOW = 0.6;
 
 export class Actor {
   readonly pos: THREE.Vector3;
@@ -26,6 +32,8 @@ export class Actor {
   chargeSide: SwingSide = 'fore';
   private comboT = 0;
   private firstBtn: 'a' | 'b' | 'x' | 'y' | '' = '';
+  /** button that opened the current wind-up (for release detection) */
+  get chargeBtn(): 'a' | 'b' | 'x' | 'y' | '' { return this.firstBtn; }
   swingLock = 0; // seconds until able to act after a swing
   intent: ActorIntent = { moveX: 0, moveZ: 0, shotPressed: '', aimX: 0, aimY: 0 };
   readonly maxSpeed: number;
@@ -34,6 +42,28 @@ export class Actor {
   readonly spinMul: number;
   /** pad for rumble (humans only) */
   pad: PadState | null = null;
+
+  /* --- dash (LB): a short burst in the direction of travel --- */
+  private dashT = 0;
+  private dashCooldown = 0;
+  private dashDir = new THREE.Vector3();
+  /** LB pressed with a neutral stick: fire as soon as a direction is given */
+  dashArmed = 0;
+  get isDashing(): boolean { return this.dashT > 0; }
+  get canDash(): boolean { return this.dashCooldown <= 0 && this.dashT <= 0 && !this.avatar.isSwinging(); }
+
+  /** returns true if the dash actually started */
+  startDash(dx: number, dz: number): boolean {
+    if (!this.canDash) return false;
+    const m = Math.hypot(dx, dz);
+    if (m < 0.2) { this.dashArmed = DASH_ARM_WINDOW; return false; }
+    this.dashDir.set(dx / m, 0, dz / m);
+    this.dashT = DASH_TIME;
+    this.dashCooldown = DASH_COOLDOWN;
+    this.dashArmed = 0;
+    this.cancelCharge();
+    return true;
+  }
 
   /* --- lunge: a committed dive/leap that extends effective reach --- */
   private lungeT = 0;
@@ -124,6 +154,8 @@ export class Actor {
 
   update(dt: number): void {
     if (this.swingLock > 0) this.swingLock -= dt;
+    if (this.dashCooldown > 0) this.dashCooldown -= dt;
+    if (this.dashArmed > 0) this.dashArmed -= dt;
     if (this.charging) {
       this.chargeTime += dt;
       if (this.comboT > 0) this.comboT -= dt;
@@ -143,6 +175,19 @@ export class Actor {
       return;
     }
 
+    if (this.dashT > 0) {
+      this.dashT -= dt;
+      const burst = this.maxSpeed * DASH_SPEED_MUL;
+      this.vel.set(this.dashDir.x * burst, 0, this.dashDir.z * burst);
+      this.pos.x += this.vel.x * dt;
+      this.pos.z += this.vel.z * dt;
+      this.clampToSide();
+      const f = this.team === 0 ? -1 : 1;
+      this.avatar.setMovement(burst, this.dashDir.x * f, this.dashDir.z * f);
+      this.avatar.update(dt);
+      return;
+    }
+
     // movement: full speed normally, slowed while charging, frozen mid-swing
     const speedMul = this.avatar.isSwinging() ? 0.15 : this.charging ? 0.72 : 1;
     const target = new THREE.Vector3(this.intent.moveX, 0, this.intent.moveZ);
@@ -154,12 +199,7 @@ export class Actor {
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
 
-    // clamp to own side + runoff
-    const xLim = COURT.widthDoubles / 2 + 3.2;
-    this.pos.x = THREE.MathUtils.clamp(this.pos.x, -xLim, xLim);
-    const zNear = 0.9, zFar = COURT.halfLength + COURT.runoff - 1.5;
-    if (this.team === 0) this.pos.z = THREE.MathUtils.clamp(this.pos.z, zNear, zFar);
-    else this.pos.z = THREE.MathUtils.clamp(this.pos.z, -zFar, -zNear);
+    this.clampToSide();
 
     // animation: convert world vel to avatar-local (team0 faces -z ⇒ local +x = world -x? avatar faces +z at yaw 0; yaw π flips x and z)
     const spd = Math.hypot(this.vel.x, this.vel.z);
@@ -172,9 +212,20 @@ export class Actor {
     this.avatar.update(dt);
   }
 
+  /** keep the player on their own side of the net and inside the run-off */
+  private clampToSide(): void {
+    const xLim = COURT.widthDoubles / 2 + 3.2;
+    this.pos.x = THREE.MathUtils.clamp(this.pos.x, -xLim, xLim);
+    const zNear = 0.9, zFar = COURT.halfLength + COURT.runoff - 1.5;
+    if (this.team === 0) this.pos.z = THREE.MathUtils.clamp(this.pos.z, zNear, zFar);
+    else this.pos.z = THREE.MathUtils.clamp(this.pos.z, -zFar, -zNear);
+  }
+
   teleport(x: number, z: number): void {
     this.pos.set(x, 0, z);
     this.vel.set(0, 0, 0);
     this.lungeT = this.lungeDur = 0;
+    this.dashT = 0;
+    this.dashArmed = 0;
   }
 }
