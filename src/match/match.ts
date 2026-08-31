@@ -607,6 +607,11 @@ export class MatchController {
    *  reach, do nothing (they must press). AI always charges via brain. */
   private tryAutoSwing(_a: Actor): void {}
 
+  /** debug/testing accessors */
+  get phaseName(): string { return this.phase; }
+  get score() { return this.scorer.snapshot(); }
+  get rallyCount(): number { return this.rallyHits; }
+
   getResultNow(): MatchResult {
     return {
       winnerTeam: this.scorer.games[0] >= this.scorer.games[1] ? 0 : 1,
