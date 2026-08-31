@@ -3,23 +3,23 @@
 Status legend: [ ] todo · [~] in progress · [x] done
 
 ## Phase 0 — Foundation (lead)
-- [~] Vite + TS + three scaffold, npm deps
-- [ ] `src/core/types.ts` contracts
-- [ ] Gamepad input manager (4 pads + keyboard fallback, menu nav events)
-- [ ] Pre-render character portraits → `public/portraits/*.png`
+- [x] Vite + TS + three scaffold, npm deps
+- [x] `src/core/types.ts` contracts
+- [x] Gamepad input manager (4 pads + keyboard fallback, menu nav events)
+- [~] Pre-render character portraits → `public/portraits/*.png` (chars agent)
 
 ## Phase 1 — Parallel modules
-- [ ] `src/world/` procedural stadium (agent: env)
-- [ ] `src/characters/` loader + procedural animation (agent: chars)
-- [ ] `src/audio/` music manager + procedural SFX (agent: audio)
-- [ ] `src/ui/` screens, HUD, icon buttons, controller diagram (agent: ui)
+- [~] `src/world/` procedural stadium (agent: env — running)
+- [~] `src/characters/` loader + procedural animation (agent: chars — running)
+- [x] `src/audio/` music manager + procedural SFX (agent: audio — done, 31 SFX verified)
+- [~] `src/ui/` screens, HUD, icon buttons, controller diagram (agent: ui — running)
 
 ## Phase 2 — Game core (lead)
-- [ ] Ball physics + shot model (topspin/slice/flat/lob/drop, charge, star shots)
-- [ ] Tennis rules & scoring (15/30/40, deuce, games/sets, tiebreak, serve rotation)
-- [ ] Player controller (tight movement, swing magnet) + AI controller
-- [ ] Match camera
-- [ ] State machine wiring all screens
+- [x] Ball physics + shot model (topspin/slice/flat/lob/drop, charge, star shots)
+- [x] Tennis rules & scoring (15/30/40, deuce, games, final game, serve rotation)
+- [x] Player controller (tight movement, charge/combo shots) + AI controller
+- [x] Match camera
+- [x] State machine wiring all screens (`src/main.ts`)
 
 ## Phase 3 — Integration & polish
 - [ ] Full flow: title → menu → char select → court select → match → victory
