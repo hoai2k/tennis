@@ -327,17 +327,20 @@ export const SPECS: Record<string, PoseSpec> = {
   },
 
   serveTrophy: {
+    // Standing tall with a modest arch — the classic trophy position. The
+    // toss arm points straight up at the ball, the racquet arm is cocked
+    // behind the shoulder. (A deep backward lean reads as falling over.)
     bones: {
-      hips: [-10, -22, 0], spine1: [-10, -10, 0], spine2: [-8, -6, 2],
-      neck1: [-12, 8, 0], head: [-22, 10, 0],
+      hips: [-4, -20, 0], spine1: [-5, -9, 0], spine2: [-4, -5, 2],
+      neck1: [-8, 6, 0], head: [-15, 8, 0],
       shoulderL: [0, 0, 14], shoulderR: [0, 0, -10],
-      upperArmL: [-12, 6, 152], forearmL: [-8, 0, 8], handL: [-8, 0, 4],
-      upperArmR: [30, -24, -96], forearmR: [92, -26, -8], handR: [12, 0, -8],
-      thighL: [-20, -8, 8], thighR: [-6, 0, -10],
-      shinL: [26, 0, 0], shinR: [14, 0, 0],
-      footL: [-8, 0, -4], footR: [-8, 8, 6],
+      upperArmL: [-8, 6, 156], forearmL: [-4, 0, 6], handL: [-6, 0, 4],
+      upperArmR: [26, -26, -100], forearmR: [104, -30, -8], handR: [14, 0, -8],
+      thighL: [-8, -8, 8], thighR: [2, 0, -10],
+      shinL: [16, 0, 0], shinR: [8, 0, 0],
+      footL: [-6, 0, -4], footR: [-6, 8, 6],
     },
-    hip: [0, -0.05, -0.03],
+    hip: [0, -0.03, -0.01],
   },
 
   serveContact: {

@@ -26,7 +26,7 @@ export const SHOT_PROFILES: Record<ShotKind, ShotProfile> = {
   lob:     { speed: 0.78, clearance: 3.6, depth: [0.78, 0.97], aimWidth: 0.6, curve: 0 },
   drop:    { speed: 0.62, clearance: 0.5, depth: [0.12, 0.3], aimWidth: 0.55, curve: -0.5 },
   smash:   { speed: 1.5, clearance: 0.12, depth: [0.55, 0.9], aimWidth: 0.9, curve: 0 },
-  serve:   { speed: 1.18, clearance: 0.28, depth: [0, 0], aimWidth: 1, curve: 0.4 },
+  serve:   { speed: 1.15, clearance: 0.28, depth: [0, 0], aimWidth: 1, curve: 0.4 },
   star:    { speed: 1.62, clearance: 0.14, depth: [0.68, 0.95], aimWidth: 0.95, curve: 0.8 },
 };
 

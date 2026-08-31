@@ -16,6 +16,15 @@ import { SHOT_PROFILES, computeTarget, solveShot } from './shots';
 
 type Phase = 'intro' | 'servePrep' | 'serveToss' | 'serveFlight' | 'rally' | 'pointEnd' | 'victory' | 'done';
 
+/** highest ball a grounded swing can reach (racquet overhead) */
+const STAND_HIT_HEIGHT = 2.35;
+/** extra height unlocked by leaping for it */
+const LEAP_EXTRA_HEIGHT = 0.95;
+/** look-ahead used to decide when to swing (seconds) */
+const REACH_HORIZON = 0.5;
+/** samples across that look-ahead */
+const REACH_SAMPLES = 12;
+
 interface PendingHit {
   t: number;
   actor: Actor;
@@ -48,6 +57,10 @@ export class MatchController {
   private pointMsg = '';
   private pointWinner: 0 | 1 = 0;
   private starConsumedBy: Actor | null = null;
+  private _contactTmp = new THREE.Vector3();
+  private _samples: THREE.Vector3[] = Array.from({ length: 12 }, () => new THREE.Vector3());
+  /** tuning counters (read by the dev harness) */
+  readonly stats = { swings: 0, lunges: 0, leaps: 0, rallies: [] as number[], endings: [] as string[], faults: 0 };
   paused = false;
   excitement = 0.3;
   onEnd: ((r: MatchResult) => void) | null = null;
@@ -114,14 +127,15 @@ export class MatchController {
     const rTeam = (1 - sTeam) as 0 | 1;
     const sx = this.serveSideSign();
     const sDir = sTeam === 0 ? 1 : -1;
-    this.server.teleport(sx * 1.7, sDir * (COURT.halfLength + 0.4));
+    const standX = this.server.isHuman ? 1.7 : 0.7 + Math.random() * 2.2;
+    this.server.teleport(sx * standX, sDir * (COURT.halfLength + 0.4));
 
     const sMates = this.teamActors(sTeam).filter((a) => a !== this.server);
     if (sMates[0]) sMates[0].teleport(-sx * 2.6, sDir * COURT.halfLength * 0.42);
 
     const rs = this.teamActors(rTeam);
     const receiver = rs[(this.scorer.pointsThisGame + this.serveGames[rTeam]) % rs.length];
-    receiver.teleport(-sx * 2.4, -sDir * (COURT.halfLength - 0.3));
+    receiver.teleport(-sx * 2.4, -sDir * (COURT.halfLength + 0.2));
     const rMates = rs.filter((a) => a !== receiver);
     if (rMates[0]) rMates[0].teleport(sx * 2.6, -sDir * COURT.halfLength * 0.5);
 
@@ -255,6 +269,7 @@ export class MatchController {
 
   private serveFault(): void {
     this.serveFaults++;
+    this.stats.faults++;
     if (this.serveFaults >= 2) {
       this.deps.audio.sfx('fault');
       this.endPoint((1 - this.scorer.servingTeam) as 0 | 1, 'DOUBLE FAULT!');
@@ -282,6 +297,9 @@ export class MatchController {
     this.phaseT = 0;
     this.pointWinner = winner;
     this.pointMsg = msg;
+    this.stats.rallies.push(this.rallyHits);
+    this.stats.endings.push(msg);
+    if (this.stats.rallies.length > 40) { this.stats.rallies.shift(); this.stats.endings.shift(); }
     this.pending = null;
     this.timers.length = 0;
     this.fx.hideStar();
@@ -337,10 +355,64 @@ export class MatchController {
     if (this.phase === 'serveFlight') return; // must let serve bounce first
     if (this.lastHitTeam === actor.team) return;
     if (actor.swingLock > 0 || actor.avatar.isSwinging()) return;
-    const d = actor.pos.distanceTo(ball.pos);
-    if (d > actor.reach) return;
+
+    // Look ahead along the ball's path once, then decide *when* to swing.
+    // The racquet sweeps an arc, so anything passing within range during the
+    // swing counts; but if the ball is still closing, wait for it rather than
+    // flailing at it early — that is what makes contact feel clean.
+    ball.sampleForward(REACH_HORIZON, REACH_SAMPLES, this._samples);
+    const swingIdx = Math.max(1, Math.round((SWING_CONTACT_DELAY / REACH_HORIZON) * REACH_SAMPLES));
+    let dSwing = Infinity;
+    let dLater = Infinity;
+    for (let i = 0; i < REACH_SAMPLES; i++) {
+      const sp = this._samples[i];
+      if (sp.y > STAND_HIT_HEIGHT + LEAP_EXTRA_HEIGHT) continue;
+      const d = Math.hypot(sp.x - actor.pos.x, sp.z - actor.pos.z);
+      if (i < swingIdx) dSwing = Math.min(dSwing, d);
+      else dLater = Math.min(dLater, d);
+    }
+    const contact = this._samples[Math.min(swingIdx, REACH_SAMPLES - 1)];
+    const dx = contact.x - actor.pos.x;
+    const dz = contact.z - actor.pos.z;
+    const dContact = Math.hypot(dx, dz);
+    const dHoriz = dSwing;
+
+    // Mario Tennis lets you stretch, dive and leap for balls outside your
+    // standing reach — the shot just comes off weaker.
+    const stand = actor.reachStand;
+    const ext = actor.reachExtended;
+    if (dHoriz > ext) return;
+    if (contact.y > STAND_HIT_HEIGHT + LEAP_EXTRA_HEIGHT || contact.y < 0) return;
+    // Still closing and it will come inside a comfortable reach? Hold the
+    // wind-up — swinging now would only produce a stretched, weak contact.
+    if (dHoriz > stand && dLater < dHoriz) return;
+    const needLeap = contact.y > STAND_HIT_HEIGHT;
+    const needLunge = dHoriz > stand;
+
     // ball must be on / coming to our side
     if (ball.vel.z * actor.dir < -3 && Math.sign(ball.pos.z) !== Math.sign(actor.dir)) return;
+
+    this.stats.swings++;
+    if (needLunge) this.stats.lunges++;
+    if (needLeap) this.stats.leaps++;
+    if (needLunge || needLeap) {
+      // travel so the ball ends up at a natural arm's length, and hop for
+      // high balls / long dives
+      const ux = dContact > 1e-4 ? dx / dContact : 0;
+      const uz = dContact > 1e-4 ? dz / dContact : 0;
+      // close the gap, but stop an arm's length short so the racquet — not the
+      // body — meets the ball; never travel further than a dive can carry
+      const travel = Math.max(0, Math.min(dContact, ext) - stand * 0.55);
+      const hop = needLeap
+        ? THREE.MathUtils.clamp(contact.y - STAND_HIT_HEIGHT + 0.32, 0.25, 0.95)
+        : travel > stand * 0.6 ? 0.3 : 0.14;
+      actor.startLunge(
+        actor.pos.x + ux * travel,
+        actor.pos.z + uz * travel,
+        SWING_CONTACT_DELAY, hop,
+      );
+      actor.pad?.rumble(0.2, 0.5, 90);
+    }
 
     // star shot?
     let kind = actor.chargeKind;
@@ -350,21 +422,28 @@ export class MatchController {
       star = true;
       this.fx.hideStar();
       this.starConsumedBy = actor;
-    } else if (ball.pos.y > 1.5 && (kind === 'flat' || kind === 'topspin')) {
+    } else if (contact.y > 1.5 && (kind === 'flat' || kind === 'topspin')) {
       kind = 'smash';
     }
 
     const aimX = actor.intent.aimX;
     const aimY = actor.intent.aimY;
     const charge = actor.charge;
-    const side = actor.sideForBallX(ball.pos.x);
-    actor.avatar.swing({ side: kind === 'smash' || kind === 'star' ? (ball.pos.y > 1.4 ? 'overhead' : side) : side, kind, power: charge });
+    const side = actor.sideForBallX(contact.x);
+    const overhead = contact.y > 1.4 && (kind === 'smash' || kind === 'star' || needLeap);
+    actor.avatar.swing({ side: overhead ? 'overhead' : side, kind, power: charge });
     actor.cancelCharge();
     actor.swingLock = 0.55;
     this.deps.audio.chargeLoop(false);
 
-    const power = actor.powerMul * (0.9 + charge * 0.32) * this.theme.ballSpeedMul;
-    this.pending = { t: SWING_CONTACT_DELAY, actor, kind, aimX, aimY, power };
+    // off-balance shots are weaker and less precise
+    const stretchMul = needLunge ? (dHoriz > stand * 1.3 ? 0.76 : 0.87) : 1;
+    const power = actor.powerMul * (0.9 + charge * 0.32) * this.theme.ballSpeedMul * stretchMul;
+    const aimJitter = needLunge ? (Math.random() - 0.5) * 0.22 : 0;
+    this.pending = {
+      t: SWING_CONTACT_DELAY, actor, kind,
+      aimX: THREE.MathUtils.clamp(aimX + aimJitter, -1, 1), aimY, power,
+    };
   }
 
   private launchPending(): void {
@@ -484,6 +563,7 @@ export class MatchController {
     // actors
     this.driveIntents(dt);
     for (const a of this.actors) a.update(dt);
+    if (this.phase === 'servePrep' || this.phase === 'serveToss') this.clampServeStance();
     this.ball.update(dt);
     this.fx.update(dt);
 
@@ -496,6 +576,14 @@ export class MatchController {
   private updateServe(dt: number): void {
     const isHuman = this.server.isHuman;
     if (!this.tossActive) {
+      // the server may walk the baseline to pick their spot before tossing
+      if (isHuman && this.server.pad) {
+        this.server.intent.moveX = this.server.pad.moveX;
+        this.server.intent.moveZ = this.server.pad.moveY * 0.65;
+      } else {
+        this.server.intent.moveX = 0;
+        this.server.intent.moveZ = 0;
+      }
       this.holdBallAtServer();
       if (isHuman) {
         if (this.server.pad?.pressed('a')) this.doToss();
@@ -504,11 +592,15 @@ export class MatchController {
         if (brain.serveTick(dt, 0, false) === 'toss') this.doToss();
       }
     } else {
+      this.server.intent.moveX = 0;
+      this.server.intent.moveZ = 0;
       this.tossT += dt;
       const g = 9.8, v0 = 4.6;
       this.tossY = v0 * this.tossT - 0.5 * g * this.tossT * this.tossT;
       const p = this.server.pos;
-      this.ball.hold(new THREE.Vector3(p.x, 1.5 + Math.max(0, this.tossY), p.z));
+      // rises from the toss hand, drifting slightly in toward the strike zone
+      const lateral = -0.33 * this.server.dir * (1 - Math.min(1, this.tossT / 0.5));
+      this.ball.hold(new THREE.Vector3(p.x + lateral, 1.25 + Math.max(0, this.tossY), p.z));
       if (this.tossY < -0.05) {
         // caught it — re-toss
         this.tossActive = false;
@@ -524,6 +616,19 @@ export class MatchController {
     }
     // non-serving actors may shuffle around
     this.driveFormationDuringServe();
+  }
+
+  /** keep the server behind their baseline and on the correct service half */
+  private clampServeStance(): void {
+    const sx = this.serveSideSign();
+    const dir = this.server.dir;
+    const halfW = (this.singles ? COURT.widthSingles : COURT.widthDoubles) / 2;
+    const p = this.server.pos;
+    const ax = THREE.MathUtils.clamp(Math.abs(p.x), 0.35, halfW - 0.25);
+    p.x = sx * ax;
+    const behind = THREE.MathUtils.clamp(p.z * dir, COURT.halfLength + 0.15, COURT.halfLength + 2.2);
+    p.z = behind * dir;
+    p.y = 0;
   }
 
   private driveFormationDuringServe(): void {
@@ -620,6 +725,7 @@ export class MatchController {
   private tryAutoSwing(_a: Actor): void {}
 
   /** debug/testing accessors */
+
   get phaseName(): string { return this.phase; }
   get score() { return this.scorer.snapshot(); }
   get rallyCount(): number { return this.rallyHits; }

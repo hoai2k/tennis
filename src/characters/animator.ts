@@ -131,9 +131,11 @@ export class Animator {
 
   serveToss(): void {
     const tl = new Timeline();
+    // The ball leaves the hand immediately and peaks at ~0.47s, so the body
+    // must reach the trophy position by then — not half a second later.
     tl.key(0, this.out.clone(), easeLinear);
-    tl.key(0.38, P('serveCrouch'), easeInOut);
-    tl.key(0.95, P('serveTrophy'), easeInOut);
+    tl.key(0.16, P('serveCrouch'), easeInOut);
+    tl.key(0.46, P('serveTrophy'), easeInOut);
     this.timeline = tl;
     this.timelineNext = 'serveHold';
     this.timelineNextFade = 0;

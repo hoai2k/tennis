@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { DEFAULT_SETTINGS, type CharacterId, type ControlSource, type CourtThemeDef, type MatchResult, type MatchSetup, type PlayerSlot } from './core/types';
+import { DEFAULT_SETTINGS, type Avatar, type CharacterId, type ControlSource, type CourtThemeDef, type MatchResult, type MatchSetup, type PlayerSlot } from './core/types';
 import { characterById } from './core/roster';
 import { InputManager } from './core/input';
 import { createAudio } from './audio';
@@ -65,6 +65,7 @@ const ui: UiApi = createUI(uiRoot, {
   },
   onCharactersConfirmed(slots) {
     pendingSlots = slots;
+    beginPrefetch(slots); // load models while the player picks a court
     state = 'court';
     const humans = slots.filter((s) => s.control !== 'ai').length;
     ui.showCourtSelect(themeDefs(), chosenMode === 'doubles' && humans >= 2);
@@ -115,6 +116,48 @@ input.onMenuAction((action, pad) => {
 
 // ---------- match lifecycle ----------
 
+/* Avatars are the slow part of entering a match (multi-MB rigged GLBs), so
+ * we start loading them the moment the roster is locked in — while the player
+ * is still choosing a court. By the time they hit PLAY the models are usually
+ * already in memory and the loading bar just flashes to 100%. */
+interface Prefetch {
+  key: string;
+  fracs: number[];
+  done: boolean[];
+  promise: Promise<Avatar[]>;
+}
+let prefetch: Prefetch | null = null;
+
+function slotsKey(slots: { characterId: CharacterId }[]): string {
+  return slots.map((s) => s.characterId).join('|');
+}
+
+function beginPrefetch(slots: { characterId: CharacterId }[]): Prefetch {
+  const defs = slots.map((s) => characterById(s.characterId));
+  const fracs = defs.map(() => 0);
+  const done = defs.map(() => false);
+  const promise = Promise.all(
+    defs.map((d, i) =>
+      loadAvatar(d, (f) => { fracs[i] = f; }).then((a) => {
+        fracs[i] = 1;
+        done[i] = true;
+        return a;
+      }),
+    ),
+  );
+  promise.catch(() => {}); // a failure is surfaced where it is awaited
+  prefetch = { key: slotsKey(slots), fracs, done, promise };
+  return prefetch;
+}
+
+/** 0..1 across download (weighted 55%) and parse/rig completion (45%) */
+function prefetchProgress(p: Prefetch): number {
+  const n = p.fracs.length || 1;
+  let sum = 0;
+  for (let i = 0; i < p.fracs.length; i++) sum += 0.55 * p.fracs[i] + (p.done[i] ? 0.45 : 0);
+  return sum / n;
+}
+
 function buildSetup(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHumans: boolean): MatchSetup {
   const slots = pendingSlots;
   const players: PlayerSlot[] = slots.map((s, i) => {
@@ -130,18 +173,37 @@ function buildSetup(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHumans: bo
 async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHumans: boolean): Promise<void> {
   state = 'loading';
   ui.hideAll();
-  ui.announce('LOADING…', 'normal', 60000);
+  ui.showLoading();
   const setup = buildSetup(theme, gamesToWin, splitHumans);
 
-  // rebuild stadium for the chosen theme
+  // rebuild stadium for the chosen theme (cheap: ~30ms)
   scene.remove(stadium.group);
   stadium.dispose();
   stadium = createStadium(theme.id, ui.getSettings().crowdDensity);
   scene.add(stadium.group);
 
-  const avatars = await Promise.all(
-    setup.players.map((p) => loadAvatar(characterById(p.characterId))),
+  const key = slotsKey(setup.players);
+  const job = prefetch && prefetch.key === key ? prefetch : beginPrefetch(setup.players);
+  const tick = window.setInterval(
+    () => ui.setLoadingProgress(prefetchProgress(job) * 0.97),
+    80,
   );
+  let avatars: Avatar[];
+  try {
+    avatars = await job.promise;
+  } catch (err) {
+    window.clearInterval(tick);
+    console.error('failed to load characters', err);
+    ui.hideLoading();
+    prefetch = null;
+    state = 'menu';
+    ui.showMainMenu();
+    ui.announce('LOAD FAILED — TRY AGAIN', 'big', 2600);
+    return;
+  }
+  window.clearInterval(tick);
+  prefetch = null; // these instances are now owned by the match
+  ui.setLoadingProgress(1, 'READY!');
 
   match = new MatchController(setup, avatars, theme, { audio, ui, input, stadium });
   scene.add(match.group);
@@ -153,6 +215,7 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
 
   state = 'match';
   audio.setMusic('gameplay');
+  ui.hideLoading();
   ui.showMatchHud([match.teamInfo(0), match.teamInfo(1)]);
 }
 

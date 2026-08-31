@@ -7,6 +7,16 @@ import type { MatchFx } from './effects';
 /* AI controller: fills actor.intent each frame. Competent but beatable —
  * reaction delay, positional sloppiness, occasional conservative shots. */
 
+/** how far ahead the CPU reads the ball, and at what resolution */
+const AI_HORIZON = 1.6;
+const AI_SAMPLES = 24;
+/** ball heights the CPU considers comfortably playable */
+const HIT_BAND_LO = 0.35;
+const HIT_BAND_HI = 2.1;
+/** don't chase a ball already sailing far out of play */
+const CHASE_LIMIT_X = COURT.widthDoubles / 2 + 2.5;
+const CHASE_LIMIT_Z = COURT.halfLength + 3;
+
 export class AiBrain {
   private reactT = 0;
   private intercept = new THREE.Vector3();
@@ -16,9 +26,14 @@ export class AiBrain {
   private wobble = Math.random() * 100;
   /** per-incoming-ball read error (m); rolled when a new ball comes our way */
   private readErr = 0;
+  private readErrZ = 0;
   /** a fully blown read: runs to the wrong spot and never swings */
   private willMiss = false;
   private wasIncoming = false;
+  private _strike = new THREE.Vector3();
+  private _path: THREE.Vector3[] = Array.from({ length: 24 }, () => new THREE.Vector3());
+  /** seconds until the ball reaches a hittable point on our side (-1 unknown) */
+  private tStrike = -1;
 
   constructor(private actor: Actor) {}
 
@@ -47,29 +62,57 @@ export class AiBrain {
     // rallies breed bigger mistakes so points actually end (Mario-Tennis CPU feel)
     const incoming = towardUs && ctx.myTeamMayHit;
     if (incoming && !this.wasIncoming) {
-      const missChance = Math.min(0.45, 0.06 + ctx.rallyLen * 0.05);
+      const missChance = Math.min(0.34, 0.045 + ctx.rallyLen * 0.028);
       this.willMiss = Math.random() < missChance;
+      // A miss means being genuinely beaten — caught out of position far
+      // enough that the ball goes by — not standing next to it doing nothing.
       this.readErr = this.willMiss
-        ? (1.4 + Math.random() * 1.2) * (Math.random() < 0.5 ? -1 : 1)
+        ? (2.8 + Math.random() * 1.8) * (Math.random() < 0.5 ? -1 : 1)
         : (Math.random() - 0.5) * 0.5;
-      this.reactT = 0;
+      this.readErrZ = this.willMiss ? (Math.random() - 0.5) * 3.0 : 0;
+      this.reactT = this.willMiss ? -0.25 : 0; // and a beat slow to read it
+
     }
     this.wasIncoming = incoming;
 
     if (ctx.ballLive && ctx.myTeamMayHit && ctx.iAmReceiver && towardUs) {
       this.reactT += dt;
-      if (this.reactT > 0.18) {
-        // predict a good contact point: landing spot advanced by post-bounce drift
-        const land = new THREE.Vector3();
-        const t = ball.predictLanding(land);
-        if (t >= 0) {
-          this.intercept.set(
-            land.x + ball.vel.x * 0.12 + this.readErr,
-            0,
-            land.z + Math.sign(a.dir) * 1.15, // stand a step behind the bounce
-          );
+      if (this.reactT > 0.10) {
+        // Meet the ball where it is genuinely playable with the least running:
+        // scan its future path for points on our side at a hittable height and
+        // take the nearest one. (Waiting for it to drop to waist height puts
+        // you metres behind the baseline on a hard serve.)
+        ball.sampleForward(AI_HORIZON, AI_SAMPLES, this._path);
+        // Take the ball at the EARLIEST point we can actually run to. Picking
+        // the merely-nearest point makes the CPU chase a spinning ball's
+        // far-future drift, forever trailing it and never setting up.
+        let bestI = -1;
+        let fallbackI = -1;
+        let fallbackD = Infinity;
+        for (let i = 0; i < AI_SAMPLES; i++) {
+          const sp = this._path[i];
+          if (Math.sign(sp.z) !== Math.sign(a.dir)) continue;
+          if (sp.y < HIT_BAND_LO || sp.y > HIT_BAND_HI) continue;
+          if (Math.abs(sp.x) > CHASE_LIMIT_X || Math.abs(sp.z) > CHASE_LIMIT_Z) continue;
+          const d = Math.hypot(sp.x - a.pos.x, sp.z - a.pos.z);
+          if (d < fallbackD) { fallbackD = d; fallbackI = i; }
+          if (bestI >= 0) continue;
+          const t = ((i + 1) / AI_SAMPLES) * AI_HORIZON;
+          if (d <= a.maxSpeed * t + a.reachStand) bestI = i; // reachable in time
+        }
+        if (bestI < 0) bestI = fallbackI;
+        if (bestI >= 0) {
+          const sp = this._path[bestI];
+          this.tStrike = ((bestI + 1) / AI_SAMPLES) * AI_HORIZON;
+          this.intercept.set(sp.x + this.readErr, 0, sp.z + this.readErrZ);
         } else {
-          this.intercept.set(ball.pos.x + this.readErr, 0, a.pos.z);
+          const land = this._strike;
+          const lt = ball.predictLanding(land);
+          this.tStrike = lt;
+          this.intercept.set(
+            land.x + this.readErr, 0,
+            lt >= 0 ? land.z + Math.sign(a.dir) * 1.15 : a.pos.z,
+          );
         }
         // chance-shot star on our side? go for it
         if (ctx.fx.starActive && Math.sign(ctx.fx.starPos.z) === Math.sign(a.dir)) {
@@ -81,8 +124,17 @@ export class AiBrain {
         this.moveToward(this.intercept, dt, 1);
         // start charging when ball is inbound and close-ish in time
         // (a blown read never commits to the swing — the ball passes by)
-        const dist = a.pos.distanceTo(ball.pos);
-        if (!this.willMiss && !a.charging && a.swingLock <= 0 && (dist < 7 || ball.pos.distanceTo(this.intercept) < 6)) {
+        // Only wind up once nearly in position — charging costs speed, so
+        // committing early is what leaves the CPU stranded mid-court.
+        const toSpot = Math.hypot(this.intercept.x - a.pos.x, this.intercept.z - a.pos.z);
+        const nearlyThere = toSpot < 2.4;
+        const soon = this.tStrike >= 0 && this.tStrike < 0.85;
+        // Safety net: if the ball is already inside our reach we swing, full
+        // stop. Positional heuristics must never talk us out of a ball we can
+        // physically touch.
+        const inReachNow = Math.hypot(ball.pos.x - a.pos.x, ball.pos.z - a.pos.z) < a.reachStand * 1.15
+          && ball.pos.y < 2.3;
+        if (!a.charging && a.swingLock <= 0 && (inReachNow || (!this.willMiss && (nearlyThere || soon)))) {
           this.chooseShot(ctx);
           it.shotPressed = this.plannedBtn;
           it.aimX = this.aim.x; it.aimY = this.aim.y;

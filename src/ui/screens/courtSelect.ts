@@ -89,7 +89,7 @@ export function createCourtSelect(ctx: UiCtx): CourtSelectApi {
   let themes: CourtThemeDef[] = [];
   let showTeams = false;
   let courtIdx = 0;
-  let gamesIdx = 0; // index into GAMES
+  let gamesIdx = 1; // index into GAMES (default: 2 games)
   let teamsIdx = 0; // 0 = side by side, 1 = rivals
   let row = 0; // 0 courts, 1 games, 2 teams(optional), 3 play
   const GAMES: (1 | 2 | 4)[] = [1, 2, 4];
@@ -194,7 +194,7 @@ export function createCourtSelect(ctx: UiCtx): CourtSelectApi {
       themes = t;
       showTeams = showTeamOption;
       courtIdx = 0;
-      gamesIdx = 0;
+      gamesIdx = 1; // default: 2 games to win
       teamsIdx = 0;
       row = 0;
       build();

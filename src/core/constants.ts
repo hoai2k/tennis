@@ -30,6 +30,6 @@ export const BALL = {
 } as const;
 
 /** base movement speed in m/s at speed stat 3 */
-export const PLAYER_BASE_SPEED = 7.2;
+export const PLAYER_BASE_SPEED = 9.4;
 /** base shot speed in m/s at power stat 3, uncharged */
 export const SHOT_BASE_SPEED = 21;

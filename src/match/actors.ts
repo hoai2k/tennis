@@ -35,6 +35,14 @@ export class Actor {
   /** pad for rumble (humans only) */
   pad: PadState | null = null;
 
+  /* --- lunge: a committed dive/leap that extends effective reach --- */
+  private lungeT = 0;
+  private lungeDur = 0;
+  private lungeFrom = new THREE.Vector3();
+  private lungeTo = new THREE.Vector3();
+  private lungeHop = 0;
+  get isLunging(): boolean { return this.lungeT < this.lungeDur; }
+
   constructor(
     readonly avatar: Avatar,
     readonly slot: number,
@@ -90,6 +98,25 @@ export class Actor {
   /** charge power 0..1 (fills in ~1s) */
   get charge(): number { return Math.min(1, this.chargeTime / 1.0); }
 
+  /** horizontal reach when standing still */
+  get reachStand(): number { return this.reach; }
+  /** reach when allowed to dive/leap for it (Mario-Tennis-style stretch) */
+  get reachExtended(): number { return this.reach * 1.62; }
+
+  /**
+   * Commit to a dive/leap toward a contact point just outside normal reach.
+   * The body travels there over `dur` so the racquet arrives with the ball;
+   * `hop` lifts the character off the ground for high balls and long dives.
+   */
+  startLunge(x: number, z: number, dur: number, hop: number): void {
+    this.lungeFrom.copy(this.pos);
+    this.lungeTo.set(x, 0, z);
+    this.lungeDur = Math.max(0.05, dur);
+    this.lungeT = 0;
+    this.lungeHop = hop;
+    this.vel.set(0, 0, 0);
+  }
+
   update(dt: number): void {
     if (this.swingLock > 0) this.swingLock -= dt;
     if (this.charging) {
@@ -97,8 +124,22 @@ export class Actor {
       if (this.comboT > 0) this.comboT -= dt;
     }
 
+    // a lunge overrides normal locomotion until it lands
+    if (this.lungeT < this.lungeDur) {
+      this.lungeT += dt;
+      const k = Math.min(1, this.lungeT / this.lungeDur);
+      const ease = 1 - (1 - k) * (1 - k); // ease-out: explosive push, soft arrival
+      this.pos.x = THREE.MathUtils.lerp(this.lungeFrom.x, this.lungeTo.x, ease);
+      this.pos.z = THREE.MathUtils.lerp(this.lungeFrom.z, this.lungeTo.z, ease);
+      this.pos.y = this.lungeHop * Math.sin(Math.PI * Math.min(1, k * 1.15));
+      this.avatar.setMovement(0, 0, 0);
+      this.avatar.update(dt);
+      if (this.lungeT >= this.lungeDur) this.pos.y = 0;
+      return;
+    }
+
     // movement: full speed normally, slowed while charging, frozen mid-swing
-    const speedMul = this.avatar.isSwinging() ? 0.15 : this.charging ? 0.5 : 1;
+    const speedMul = this.avatar.isSwinging() ? 0.15 : this.charging ? 0.72 : 1;
     const target = new THREE.Vector3(this.intent.moveX, 0, this.intent.moveZ);
     if (target.lengthSq() > 1) target.normalize();
     target.multiplyScalar(this.maxSpeed * speedMul);
@@ -129,5 +170,6 @@ export class Actor {
   teleport(x: number, z: number): void {
     this.pos.set(x, 0, z);
     this.vel.set(0, 0, 0);
+    this.lungeT = this.lungeDur = 0;
   }
 }

@@ -5,7 +5,7 @@ import type {
 import { DEFAULT_SETTINGS } from '../core/types';
 import type { Modal, Screen, UiCtx } from './context';
 import { createCornerButtons } from './corner';
-import { div } from './dom';
+import { ballSVG, div } from './dom';
 import { Hud } from './hud';
 import { createInstructionsModal, createPauseMenu, createSettingsModal } from './modals';
 import { createCharSelect } from './screens/charSelect';
@@ -55,6 +55,10 @@ export interface UiApi {
   showPauseMenu(): void; hidePauseMenu(): void;
   /** charge meter for a player 0..1, -1 hides (positioned near bottom corners by slot) */
   setCharge(slot: number, v: number): void;
+  /** full-screen loading overlay with a progress bar (0..1) */
+  showLoading(): void;
+  setLoadingProgress(fraction: number, label?: string): void;
+  hideLoading(): void;
   getSettings(): GameSettings;
 }
 
@@ -203,6 +207,23 @@ export function createUI(root: HTMLElement, cb: UiCallbacks, initial: GameSettin
     if (modalStack.length) popModal();
   }
 
+  // ---------------- loading overlay ----------------
+  const loadingEl = div('cc-loading');
+  loadingEl.hidden = true;
+  const loadingCard = div('cc-loading-card');
+  loadingCard.appendChild(div('cc-loading-title', 'ENTERING THE COURT'));
+  const loadingTrack = div('cc-loading-track');
+  const loadingFill = div('cc-loading-fill');
+  loadingTrack.appendChild(loadingFill);
+  loadingCard.appendChild(loadingTrack);
+  const loadingLabel = div('cc-loading-label', 'Loading\u2026');
+  loadingCard.appendChild(loadingLabel);
+  const loadingBall = div('cc-loading-ball');
+  loadingBall.innerHTML = ballSVG(46, 'cc-loading-ball-svg');
+  loadingCard.appendChild(loadingBall);
+  loadingEl.appendChild(loadingCard);
+  uiRoot.appendChild(loadingEl);
+
   // ---------------- persistent corner buttons ----------------
   uiRoot.appendChild(createCornerButtons({
     openInstructions: () => openModal('instructions'),
@@ -227,6 +248,22 @@ export function createUI(root: HTMLElement, cb: UiCallbacks, initial: GameSettin
         return;
       }
       currentScreen?.handleMenu(action, padIndex);
+    },
+
+    showLoading() {
+      loadingFill.style.width = '0%';
+      loadingLabel.textContent = 'Loading\u2026';
+      loadingEl.hidden = false;
+    },
+
+    setLoadingProgress(fraction: number, label?: string) {
+      const pct = Math.max(0, Math.min(1, fraction)) * 100;
+      loadingFill.style.width = `${pct.toFixed(1)}%`;
+      loadingLabel.textContent = label ?? `${Math.round(pct)}%`;
+    },
+
+    hideLoading() {
+      loadingEl.hidden = true;
     },
 
     showTitle() {

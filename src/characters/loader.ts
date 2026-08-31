@@ -37,8 +37,13 @@ export interface LoadedModel {
 /** raw models face +Z (verified: toe bones point +Z); no facing fix needed */
 export const MODELS_FACE_NEG_Z = false;
 
-export async function loadModel(def: CharacterDef): Promise<LoadedModel> {
-  const gltf = await getLoader().loadAsync(def.model);
+export async function loadModel(
+  def: CharacterDef,
+  onProgress?: (fraction: number) => void,
+): Promise<LoadedModel> {
+  const gltf = await getLoader().loadAsync(def.model, (e) => {
+    if (onProgress && e.total > 0) onProgress(Math.min(1, e.loaded / e.total));
+  });
 
   const scene = gltf.scene;
   scene.updateMatrixWorld(true);

@@ -38,6 +38,8 @@ export class Ball {
   private trailPos: THREE.Vector3[] = [];
   private trailColor = new THREE.Color(0xffe14a);
   private bouncesSinceHit = 0;
+  private _simP = new THREE.Vector3();
+  private _simV = new THREE.Vector3();
   private sideOfLastBounce = 0;
   events: BallEvents | null = null;
 
@@ -202,6 +204,34 @@ export class Ball {
       this.trail.setMatrixAt(i, m);
     }
     this.trail.instanceMatrix.needsUpdate = true;
+  }
+
+  /**
+   * Positions at `count` evenly spaced times up to `horizon` seconds ahead,
+   * bounces included — one forward pass shared by every reach test.
+   */
+  sampleForward(horizon: number, count: number, out: THREE.Vector3[]): void {
+    const p = this._simP.copy(this.pos);
+    const v = this._simV.copy(this.vel);
+    const h = 1 / 240;
+    const step = horizon / count;
+    let next = step;
+    let idx = 0;
+    for (let t = 0; t < horizon && idx < count; t += h) {
+      v.y += GRAVITY * h;
+      v.x += this.spin.x * 6 * h;
+      v.y += this.spin.y * -5.5 * h;
+      p.addScaledVector(v, h);
+      if (p.y < BALL.radius && v.y < 0) {
+        p.y = BALL.radius;
+        v.y = -v.y * BALL.bounceRestitution * this.bounceRestitutionMul;
+        if (this.spin.y > 0.5) { v.z *= 1.12; v.y *= 0.9; }
+        else if (this.spin.y < -0.4) { v.z *= 0.82; v.y *= 0.75; }
+        v.x *= 0.92; v.z *= 0.96;
+      }
+      if (t + h >= next) { out[idx++].copy(p); next += step; }
+    }
+    while (idx < count) out[idx++].copy(p);
   }
 
   /** predict landing point (y = radius) from current state; returns time or -1 */

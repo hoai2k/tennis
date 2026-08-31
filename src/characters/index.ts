@@ -171,8 +171,12 @@ class AvatarImpl implements Avatar {
   }
 }
 
-export async function loadAvatar(def: CharacterDef): Promise<Avatar> {
-  const { root, container, meshes, materials } = await loadModel(def);
+export async function loadAvatar(
+  def: CharacterDef,
+  /** 0..1 download progress; fires only while bytes are in flight */
+  onProgress?: (fraction: number) => void,
+): Promise<Avatar> {
+  const { root, container, meshes, materials } = await loadModel(def, onProgress);
   return new AvatarImpl(def, root, container, meshes, materials);
 }
 
