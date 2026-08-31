@@ -234,6 +234,28 @@ export class Ball {
     while (idx < count) out[idx++].copy(p);
   }
 
+  /** exact position `t` seconds ahead (bounce included) — used to place the
+   *  contact magnet precisely on the ball at the swing's contact frame */
+  predictAt(t: number, out: THREE.Vector3): THREE.Vector3 {
+    const p = this._simP.copy(this.pos);
+    const v = this._simV.copy(this.vel);
+    const h = 1 / 240;
+    for (let e = 0; e < t; e += h) {
+      v.y += GRAVITY * h;
+      v.x += this.spin.x * 6 * h;
+      v.y += this.spin.y * -5.5 * h;
+      p.addScaledVector(v, h);
+      if (p.y < BALL.radius && v.y < 0) {
+        p.y = BALL.radius;
+        v.y = -v.y * BALL.bounceRestitution * this.bounceRestitutionMul;
+        if (this.spin.y > 0.5) { v.z *= 1.12; v.y *= 0.9; }
+        else if (this.spin.y < -0.4) { v.z *= 0.82; v.y *= 0.75; }
+        v.x *= 0.92; v.z *= 0.96;
+      }
+    }
+    return out.copy(p);
+  }
+
   /** predict landing point (y = radius) from current state; returns time or -1 */
   predictLanding(outPos: THREE.Vector3): number {
     // simple ballistic sim clone (cheap, ~60 iters max)

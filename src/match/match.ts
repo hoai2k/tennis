@@ -3,7 +3,7 @@ import { COURT } from '../core/constants';
 import {
   SWING_CONTACT_DELAY,
   type AudioApi, type Avatar, type CourtThemeDef, type MatchResult,
-  type MatchSetup, type ShotKind, type StadiumApi, type TeamInfo,
+  type MatchSetup, type ShotKind, type StadiumApi, type SwingSide, type TeamInfo,
 } from '../core/types';
 import type { UiApi } from '../ui';
 import type { InputManager } from '../core/input';
@@ -20,6 +20,20 @@ type Phase = 'intro' | 'servePrep' | 'serveToss' | 'serveFlight' | 'rally' | 'po
 const STAND_HIT_HEIGHT = 2.35;
 /** extra height unlocked by leaping for it */
 const LEAP_EXTRA_HEIGHT = 0.95;
+/** character-local racquet-head offset at the contact frame (measured on a
+ *  1.73m body, per kind+side); the magnet subtracts this to find where the
+ *  FEET belong for clean contact */
+const CONTACT_OFFSET: Record<string, { x: number; z: number }> = {
+  topspin_fore: { x: -0.82, z: 0.83 }, topspin_back: { x: 0.63, z: 0.20 },
+  slice_fore: { x: -0.79, z: 0.83 },   slice_back: { x: 0.64, z: 0.30 },
+  flat_fore: { x: -0.81, z: 0.83 },    flat_back: { x: 0.65, z: 0.22 },
+  lob_fore: { x: -0.73, z: 0.86 },     lob_back: { x: 0.67, z: 0.34 },
+  drop_fore: { x: -0.86, z: 0.63 },    drop_back: { x: 0.60, z: 0.09 },
+  star_fore: { x: -0.81, z: 0.83 },    star_back: { x: 0.65, z: 0.22 },
+  smash_fore: { x: -0.81, z: 0.83 },   smash_back: { x: 0.65, z: 0.22 },
+  overhead: { x: 0.23, z: 0.52 },
+};
+
 /** look-ahead used to decide when to swing (seconds) */
 const REACH_HORIZON = 0.5;
 /** samples across that look-ahead */
@@ -371,7 +385,9 @@ export class MatchController {
       if (i < swingIdx) dSwing = Math.min(dSwing, d);
       else dLater = Math.min(dLater, d);
     }
-    const contact = this._samples[Math.min(swingIdx, REACH_SAMPLES - 1)];
+    // exact ball position at the animation's contact frame — the magnet
+    // target must be precise, not a coarse sample
+    const contact = ball.predictAt(SWING_CONTACT_DELAY, this._contactTmp);
     const dx = contact.x - actor.pos.x;
     const dz = contact.z - actor.pos.z;
     const dContact = Math.hypot(dx, dz);
@@ -395,25 +411,6 @@ export class MatchController {
     this.stats.swings++;
     if (needLunge) this.stats.lunges++;
     if (needLeap) this.stats.leaps++;
-    if (needLunge || needLeap) {
-      // travel so the ball ends up at a natural arm's length, and hop for
-      // high balls / long dives
-      const ux = dContact > 1e-4 ? dx / dContact : 0;
-      const uz = dContact > 1e-4 ? dz / dContact : 0;
-      // close the gap, but stop an arm's length short so the racquet — not the
-      // body — meets the ball; never travel further than a dive can carry
-      const travel = Math.max(0, Math.min(dContact, ext) - stand * 0.55);
-      const hop = needLeap
-        ? THREE.MathUtils.clamp(contact.y - STAND_HIT_HEIGHT + 0.32, 0.25, 0.95)
-        : travel > stand * 0.6 ? 0.3 : 0.14;
-      actor.startLunge(
-        actor.pos.x + ux * travel,
-        actor.pos.z + uz * travel,
-        SWING_CONTACT_DELAY, hop,
-      );
-      actor.pad?.rumble(0.2, 0.5, 90);
-    }
-
     // star shot?
     let kind = actor.chargeKind;
     let star = false;
@@ -431,7 +428,36 @@ export class MatchController {
     const charge = actor.charge;
     const side = actor.sideForBallX(contact.x);
     const overhead = contact.y > 1.4 && (kind === 'smash' || kind === 'star' || needLeap);
-    actor.avatar.swing({ side: overhead ? 'overhead' : side, kind, power: charge });
+    const swingSide: SwingSide = overhead ? 'overhead' : side;
+
+    // ---- contact magnet (the Mario Tennis "tight action") ----
+    // Glide the body during the wind-through so the animation's racquet
+    // contact point lands exactly on the ball, instead of swinging from
+    // wherever the feet happen to be. Big gaps become a visible dive/leap;
+    // small ones read as a step into the shot.
+    const off = swingSide === 'overhead'
+      ? CONTACT_OFFSET.overhead
+      : CONTACT_OFFSET[`${kind}_${swingSide}`] ?? CONTACT_OFFSET.topspin_fore;
+    const hScale = actor.avatar.def.height / 1.73;
+    // rotate the character-local offset into world space (yaw π for team 0)
+    const f = actor.team === 0 ? -1 : 1;
+    const worldOffX = off.x * hScale * f;
+    const worldOffZ = off.z * hScale * f;
+    let tx = contact.x - worldOffX;
+    let tz = contact.z - worldOffZ;
+    const xLim = COURT.widthDoubles / 2 + 3.0;
+    tx = THREE.MathUtils.clamp(tx, -xLim, xLim);
+    tz = actor.team === 0
+      ? THREE.MathUtils.clamp(tz, 0.7, COURT.halfLength + COURT.runoff - 1.5)
+      : THREE.MathUtils.clamp(tz, -(COURT.halfLength + COURT.runoff - 1.5), -0.7);
+    const glide = Math.hypot(tx - actor.pos.x, tz - actor.pos.z);
+    const hop = needLeap
+      ? THREE.MathUtils.clamp(contact.y - STAND_HIT_HEIGHT + 0.32, 0.25, 0.95)
+      : glide > stand ? 0.26 : 0;
+    actor.startLunge(tx, tz, SWING_CONTACT_DELAY, hop);
+    if ((needLunge || needLeap) && glide > stand) actor.pad?.rumble(0.2, 0.5, 90);
+
+    actor.avatar.swing({ side: swingSide, kind, power: charge, contactHeight: contact.y });
     actor.cancelCharge();
     actor.swingLock = 0.55;
     this.deps.audio.chargeLoop(false);

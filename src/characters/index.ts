@@ -92,7 +92,17 @@ class AvatarImpl implements Avatar {
   }
 
   swing(opts: SwingOpts): void {
-    this.animator.swing(opts);
+    // each kind/side pair has its own natural contact height (fraction of
+    // body height, measured); map the requested world height to a
+    // -1 (shin-level) .. +1 (overhead-reach) adjustment factor
+    let hf = 0;
+    if (opts.contactHeight !== undefined && opts.side !== 'overhead') {
+      const key = `${opts.kind}_${opts.side}`;
+      const frac = NOMINAL_CONTACT_FRAC[key] ?? 0.59;
+      const nominal = frac * this.def.height;
+      hf = THREE.MathUtils.clamp((opts.contactHeight - nominal) / (0.5 * this.def.height), -1, 1);
+    }
+    this.animator.swing(opts, hf);
   }
 
   isSwinging(): boolean {
@@ -170,6 +180,17 @@ class AvatarImpl implements Avatar {
     }
   }
 }
+
+/** measured racquet height at the contact frame / body height, per shot */
+const NOMINAL_CONTACT_FRAC: Record<string, number> = {
+  topspin_fore: 0.59, topspin_back: 0.50,
+  slice_fore: 0.75, slice_back: 0.57,
+  flat_fore: 0.64, flat_back: 0.53,
+  lob_fore: 0.66, lob_back: 0.56,
+  drop_fore: 0.75, drop_back: 0.57,
+  star_fore: 0.64, star_back: 0.53,
+  smash_fore: 0.64, smash_back: 0.53,
+};
 
 export async function loadAvatar(
   def: CharacterDef,

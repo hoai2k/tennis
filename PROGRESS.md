@@ -37,3 +37,10 @@ Status legend: [ ] todo · [~] in progress · [x] done
       all 38 game assets (models/music/portraits/images) return 200
 
 **Status: COMPLETE** — merged to `main` and live at https://hoai2k.github.io/tennis/
+
+## Phase 5 — Contact & feel audit
+- [x] Measured racquet→ball distance at every hit: was median 0.95m / max 3.4m (visible whiffs)
+- [x] Contact magnet: body glides so the animation's contact point lands on the ball → median 0.42m / max 0.62m (ball-on-strings)
+- [x] Height-adaptive swings: crouch for low balls, reach for high (racquet tracks requested height ~linearly, per-kind calibrated baselines)
+- [x] Mario Tennis parity: double-tap same button boosts charge; charge fills in 0.8s; volleys, combos, stars, power serves all verified present
+- [x] Frozen-frame visual verification of hits from the gameplay camera

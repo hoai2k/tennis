@@ -121,8 +121,8 @@ export class Animator {
     if (this.state === 'charge') this.setState('ready', 0.28);
   }
 
-  swing(opts: SwingOpts): void {
-    this.timeline = this.buildSwing(opts);
+  swing(opts: SwingOpts, heightFactor = 0): void {
+    this.timeline = this.buildSwing(opts, heightFactor);
     this.timelineNext = 'ready';
     this.timelineNextFade = 0.28;
     this.swinging = true;
@@ -438,10 +438,11 @@ export class Animator {
 
   // ------------------------------------------------ swing construction
 
-  private buildSwing(opts: SwingOpts): Timeline {
+  private buildSwing(opts: SwingOpts, heightFactor = 0): Timeline {
     const { side } = opts;
     const kind = opts.kind;
     const p = THREE.MathUtils.clamp(opts.power, 0, 1);
+    const hf = THREE.MathUtils.clamp(heightFactor, -1, 1);
     const tl = new Timeline();
 
     const overhead = side === 'overhead' || kind === 'smash' || kind === 'serve';
@@ -485,6 +486,25 @@ export class Animator {
     if (kind === 'drop') contact.scale(0.85);
     if (kind === 'flat' || kind === 'star') contact.scale(1.0);
     if (overhead) contact.hipAdd(0, 0.05 + 0.14 * p, 0);
+    // meet the ball where it actually is: sink into the knees for low balls,
+    // stand tall + raise the arm for high ones
+    if (!overhead && hf !== 0) {
+      // (for the right arm, negative Z-roll raises the racquet on the
+      // forehand side; mirrored for backhands)
+      if (hf < 0) {
+        contact.hipAdd(0, 0.24 * hf, 0); // sink into the knees (hf negative)
+        contact.rot('thighL', -16 * hf, 0, 0);
+        contact.rot('thighR', -16 * hf, 0, 0);
+        contact.rot('shinL', -24 * hf, 0, 0);
+        contact.rot('shinR', -24 * hf, 0, 0);
+        contact.rot('upperArmR', 0, 0, (fore ? -22 : 22) * hf);
+        contact.rot('forearmR', 0, 0, (fore ? -10 : 10) * hf);
+      } else {
+        contact.hipAdd(0, 0.06 * hf, 0); // rise onto the toes
+        contact.rot('upperArmR', 0, 0, (fore ? -34 : 34) * hf);
+        contact.rot('spine1', -6 * hf, 0, 0);
+      }
+    }
     tl.key(SWING_CONTACT_DELAY, contact, easeIn);
 
     // FOLLOW-THROUGH

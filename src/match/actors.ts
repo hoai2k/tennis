@@ -78,9 +78,14 @@ export class Actor {
     this.avatar.startCharge(side);
   }
 
-  /** second button press while charging → combo shots */
+  /** second button press while charging → combo shots; the SAME button
+   *  again is Mario Tennis's double-tap, which pumps extra charge in */
   comboPress(btn: 'a' | 'b' | 'x' | 'y'): void {
-    if (!this.charging || btn === this.firstBtn) return;
+    if (!this.charging) return;
+    if (btn === this.firstBtn) {
+      this.chargeTime = Math.min(this.chargeTime + 0.45, 1.4);
+      return;
+    }
     if (this.comboT > 0) {
       if (this.firstBtn === 'a' && btn === 'b') this.chargeKind = 'drop';
       else if (this.firstBtn === 'b' && btn === 'a') this.chargeKind = 'lob';
@@ -96,7 +101,7 @@ export class Actor {
   }
 
   /** charge power 0..1 (fills in ~1s) */
-  get charge(): number { return Math.min(1, this.chargeTime / 1.0); }
+  get charge(): number { return Math.min(1, this.chargeTime / 0.8); }
 
   /** horizontal reach when standing still */
   get reachStand(): number { return this.reach; }

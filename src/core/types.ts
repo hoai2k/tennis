@@ -58,6 +58,9 @@ export interface SwingOpts {
   kind: ShotKind;
   /** 0..1 charge amount — affects animation vigor */
   power: number;
+  /** world-space height the ball will be met at; the animation crouches for
+   *  low balls and reaches up for high ones (optional) */
+  contactHeight?: number;
 }
 
 /**
