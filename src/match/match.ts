@@ -596,9 +596,11 @@ export class MatchController {
     this.ball.update(dt);
     this.fx.update(dt);
 
-    // charge meters for humans
+    // charge + stamina meters for humans
     for (const a of this.actors) {
-      if (a.isHuman) this.deps.ui.setCharge(a.slot, a.charging ? a.charge : -1);
+      if (!a.isHuman) continue;
+      this.deps.ui.setCharge(a.slot, a.charging ? a.charge : -1);
+      this.deps.ui.setStamina(a.slot, a.energy);
     }
   }
 
@@ -660,12 +662,10 @@ export class MatchController {
     p.y = 0;
   }
 
-  private onDash(actor: Actor): void {
-    this.deps.audio.sfx('whiff', { gain: 0.35, rate: 1.4 });
-    this.deps.audio.chargeLoop(false);
-    actor.avatar.setGlow(0);
-    actor.pad?.rumble(0.5, 0.25, 110);
-    this.fx.hitSpark(actor.pos, new THREE.Color(actor.avatar.def.color).getHex(), false);
+  /** one-shot kick when a sprint begins (not every frame it continues) */
+  private onSprintStart(actor: Actor): void {
+    this.deps.audio.sfx('footstep', { gain: 0.5, rate: 1.5 });
+    actor.pad?.rumble(0.25, 0.15, 70);
   }
 
   private driveFormationDuringServe(): void {
@@ -734,12 +734,10 @@ export class MatchController {
       // visible wind-up feedback: the character glows brighter as it charges
       if (a.charging) a.avatar.setGlow(0.14 + a.charge * 0.56);
 
-      // LB dash — in the direction of travel, or armed until a direction comes
-      if (a.pad.pressed('lb')) {
-        if (a.startDash(a.pad.moveX, a.pad.moveY)) this.onDash(a);
-      } else if (a.dashArmed > 0 && Math.hypot(a.pad.moveX, a.pad.moveY) > 0.35) {
-        if (a.startDash(a.pad.moveX, a.pad.moveY)) this.onDash(a);
-      }
+      // hold LB to sprint — steerable, and you can still swing out of it
+      const wasSprinting = a.isSprinting;
+      a.sprintHeld = a.pad.held('lb');
+      if (!wasSprinting && a.sprintHeld && a.energy > 0.02) this.onSprintStart(a);
     }
   }
 

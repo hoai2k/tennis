@@ -55,6 +55,8 @@ export interface UiApi {
   showPauseMenu(): void; hidePauseMenu(): void;
   /** charge meter for a player 0..1, -1 hides (positioned near bottom corners by slot) */
   setCharge(slot: number, v: number): void;
+  /** sprint stamina 0..1 for a player, -1 hides */
+  setStamina(slot: number, v: number): void;
   /** full-screen loading overlay with a progress bar (0..1) */
   showLoading(): void;
   setLoadingProgress(fraction: number, label?: string): void;
@@ -343,6 +345,10 @@ export function createUI(root: HTMLElement, cb: UiCallbacks, initial: GameSettin
 
     showPauseMenu,
     hidePauseMenu,
+
+    setStamina(slot: number, v: number) {
+      hud.setStamina(slot, v);
+    },
 
     setCharge(slot: number, v: number) {
       hud.setCharge(slot, v);

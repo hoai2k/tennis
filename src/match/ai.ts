@@ -122,6 +122,9 @@ export class AiBrain {
       }
       if (this.hasIntercept) {
         this.moveToward(this.intercept, dt, 1);
+        // sprint when there is real ground to cover and stamina to spend
+        const gap = Math.hypot(this.intercept.x - a.pos.x, this.intercept.z - a.pos.z);
+        a.sprintHeld = gap > 2.8 && a.energy > 0.28;
         // start charging when ball is inbound and close-ish in time
         // (a blown read never commits to the swing — the ball passes by)
         // Only wind up once nearly in position — charging costs speed, so
@@ -142,7 +145,8 @@ export class AiBrain {
         if (a.charging) { it.aimX = this.aim.x; it.aimY = this.aim.y; }
       }
     } else {
-      // recover to formation
+      // recover to formation at a jog, saving stamina for the next ball
+      a.sprintHeld = false;
       this.reactT = 0;
       this.hasIntercept = false;
       const home = this.homePosition(ctx);

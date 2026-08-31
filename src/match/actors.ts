@@ -16,12 +16,16 @@ export interface ActorIntent {
 }
 
 const COMBO_WINDOW = 0.24;
-/** LB dash tuning */
-const DASH_TIME = 0.20;
-const DASH_COOLDOWN = 0.7;
-const DASH_SPEED_MUL = 1.9;
-/** how long an LB press stays armed waiting for a direction */
-const DASH_ARM_WINDOW = 0.6;
+/** sprint tuning: a sustained boost you steer, not a fixed-length dash */
+const SPRINT_SPEED_MUL = 1.5;
+/** full bar lasts this long at a flat sprint (seconds) */
+const SPRINT_DRAIN = 1 / 2.6;
+/** and refills in about this long once released */
+const SPRINT_REGEN = 1 / 3.4;
+/** pause before stamina starts coming back */
+const SPRINT_REGEN_DELAY = 0.35;
+/** after bottoming out, this much must be banked before sprinting again */
+const SPRINT_UNLOCK_AT = 0.25;
 
 export class Actor {
   readonly pos: THREE.Vector3;
@@ -43,27 +47,16 @@ export class Actor {
   /** pad for rumble (humans only) */
   pad: PadState | null = null;
 
-  /* --- dash (LB): a short burst in the direction of travel --- */
-  private dashT = 0;
-  private dashCooldown = 0;
-  private dashDir = new THREE.Vector3();
-  /** LB pressed with a neutral stick: fire as soon as a direction is given */
-  dashArmed = 0;
-  get isDashing(): boolean { return this.dashT > 0; }
-  get canDash(): boolean { return this.dashCooldown <= 0 && this.dashT <= 0 && !this.avatar.isSwinging(); }
-
-  /** returns true if the dash actually started */
-  startDash(dx: number, dz: number): boolean {
-    if (!this.canDash) return false;
-    const m = Math.hypot(dx, dz);
-    if (m < 0.2) { this.dashArmed = DASH_ARM_WINDOW; return false; }
-    this.dashDir.set(dx / m, 0, dz / m);
-    this.dashT = DASH_TIME;
-    this.dashCooldown = DASH_COOLDOWN;
-    this.dashArmed = 0;
-    this.cancelCharge();
-    return true;
-  }
+  /* --- sprint (hold LB): sustained extra speed, spends stamina --- */
+  /** 0..1 stamina; drains while sprinting, recovers when you let go */
+  energy = 1;
+  /** set each frame by the controller: is the sprint button held? */
+  sprintHeld = false;
+  private sprinting = false;
+  private regenDelay = 0;
+  get isSprinting(): boolean { return this.sprinting; }
+  /** stamina is gated: once emptied you must recover a little before re-sprinting */
+  private sprintLocked = false;
 
   /* --- lunge: a committed dive/leap that extends effective reach --- */
   private lungeT = 0;
@@ -154,8 +147,7 @@ export class Actor {
 
   update(dt: number): void {
     if (this.swingLock > 0) this.swingLock -= dt;
-    if (this.dashCooldown > 0) this.dashCooldown -= dt;
-    if (this.dashArmed > 0) this.dashArmed -= dt;
+
     if (this.charging) {
       this.chargeTime += dt;
       if (this.comboT > 0) this.comboT -= dt;
@@ -175,21 +167,28 @@ export class Actor {
       return;
     }
 
-    if (this.dashT > 0) {
-      this.dashT -= dt;
-      const burst = this.maxSpeed * DASH_SPEED_MUL;
-      this.vel.set(this.dashDir.x * burst, 0, this.dashDir.z * burst);
-      this.pos.x += this.vel.x * dt;
-      this.pos.z += this.vel.z * dt;
-      this.clampToSide();
-      const f = this.team === 0 ? -1 : 1;
-      this.avatar.setMovement(burst, this.dashDir.x * f, this.dashDir.z * f);
-      this.avatar.update(dt);
-      return;
+    // --- sprint & stamina ---
+    // Sprinting is just a speed multiplier, so you keep full steering and can
+    // still wind up and swing out of it; it simply costs stamina.
+    const wantsSprint = this.sprintHeld
+      && !this.sprintLocked
+      && this.energy > 0
+      && Math.hypot(this.intent.moveX, this.intent.moveZ) > 0.15
+      && !this.avatar.isSwinging();
+    this.sprinting = wantsSprint;
+    if (wantsSprint) {
+      this.energy = Math.max(0, this.energy - SPRINT_DRAIN * dt);
+      this.regenDelay = SPRINT_REGEN_DELAY;
+      if (this.energy <= 0) this.sprintLocked = true;
+    } else {
+      if (this.regenDelay > 0) this.regenDelay -= dt;
+      else this.energy = Math.min(1, this.energy + SPRINT_REGEN * dt);
+      if (this.sprintLocked && this.energy >= SPRINT_UNLOCK_AT) this.sprintLocked = false;
     }
 
     // movement: full speed normally, slowed while charging, frozen mid-swing
-    const speedMul = this.avatar.isSwinging() ? 0.15 : this.charging ? 0.72 : 1;
+    const speedMul = (this.avatar.isSwinging() ? 0.15 : this.charging ? 0.72 : 1)
+      * (this.sprinting ? SPRINT_SPEED_MUL : 1);
     const target = new THREE.Vector3(this.intent.moveX, 0, this.intent.moveZ);
     if (target.lengthSq() > 1) target.normalize();
     target.multiplyScalar(this.maxSpeed * speedMul);
@@ -225,7 +224,7 @@ export class Actor {
     this.pos.set(x, 0, z);
     this.vel.set(0, 0, 0);
     this.lungeT = this.lungeDur = 0;
-    this.dashT = 0;
-    this.dashArmed = 0;
+    this.sprinting = false;
+    this.sprintHeld = false;
   }
 }

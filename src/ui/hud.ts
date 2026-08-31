@@ -20,7 +20,7 @@ export class Hud {
   private tiebreakTag: HTMLElement;
   private announceLayer: HTMLElement;
   private announceTimer: number | undefined;
-  private chargeEls: { wrap: HTMLElement; fill: HTMLElement }[] = [];
+  private chargeEls: { wrap: HTMLElement; fill: HTMLElement; stam: HTMLElement }[] = [];
   private lastPoints: [string, string] = ['', ''];
   private lastGames: [number, number] = [-1, -1];
 
@@ -44,12 +44,17 @@ export class Hud {
       const ring = div('cc-charge-ring');
       const fill = div('cc-charge-fill');
       const label = div('cc-charge-label', `P${i + 1}`);
+      // sprint stamina sits under the charge ring
+      const stamTrack = div('cc-stamina');
+      const stam = div('cc-stamina-fill');
+      stamTrack.appendChild(stam);
       ring.appendChild(fill);
       wrap.appendChild(ring);
+      wrap.appendChild(stamTrack);
       wrap.appendChild(label);
       wrap.hidden = true;
       chargeLayer.appendChild(wrap);
-      this.chargeEls.push({ wrap, fill });
+      this.chargeEls.push({ wrap, fill, stam });
     }
     this.el.appendChild(chargeLayer);
   }
@@ -140,11 +145,26 @@ export class Hud {
     this.announceLayer.innerHTML = '';
   }
 
+  /** sprint stamina 0..1 (-1 hides the whole meter cluster) */
+  setStamina(slot: number, v: number): void {
+    const c = this.chargeEls[slot];
+    if (!c) return;
+    if (v < 0) return;
+    c.wrap.hidden = false;
+    const f = Math.min(1, Math.max(0, v));
+    c.stam.style.width = `${(f * 100).toFixed(1)}%`;
+    // amber when running low, red when spent
+    c.stam.classList.toggle('cc-stamina-low', f < 0.34);
+    c.stam.classList.toggle('cc-stamina-out', f <= 0.02);
+  }
+
   setCharge(slot: number, v: number): void {
     const c = this.chargeEls[slot];
     if (!c) return;
     if (v < 0) {
-      c.wrap.hidden = true;
+      // the cluster stays up for the stamina bar; just empty the ring
+      c.fill.style.background = 'conic-gradient(rgba(255,255,255,0.14) 0deg, rgba(255,255,255,0.14) 360deg)';
+      c.wrap.classList.remove('cc-charge-full');
       return;
     }
     c.wrap.hidden = false;

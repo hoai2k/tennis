@@ -106,7 +106,7 @@ export class InputManager {
       case 'KeyK': return 'b';
       case 'KeyL': return 'x';
       case 'KeyI': return 'y';
-      case 'ShiftLeft': return 'rt';
+      case 'ShiftLeft': case 'KeyQ': return 'lb'; // sprint
       case 'Enter': return 'start';
       case 'Escape': case 'Backspace': return 'b';
       default: return null;

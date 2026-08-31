@@ -239,6 +239,7 @@ export function createInstructionsModal(ctx: UiCtx, close: () => void): Modal {
   const tips = div('cc-instr-tips');
   const tipData: [string, string][] = [
     ['A then B', 'Drop Shot — dies at the net'],
+    ['Hold LB', 'SPRINT — steer freely, swing any time'],
     ['Hold early', 'CHARGE the shot for extra power'],
     ['Swing from a ⭐', 'STAR SHOT!'],
     ['Serve', 'A to toss · A again at the peak = power serve'],
@@ -254,7 +255,7 @@ export function createInstructionsModal(ctx: UiCtx, close: () => void): Modal {
   const foot = div('cc-instr-foot');
   foot.appendChild(div('cc-instr-foot-line', 'Menus:  D-Pad / Stick move · Ⓐ confirm · Ⓑ back'));
   foot.appendChild(div('cc-instr-foot-line cc-instr-kbd',
-    'Keyboard (dev):  WASD / Arrows move · J K L I = A B X Y · Enter = Start'));
+    'Keyboard (dev):  WASD / Arrows move · J K L I = A B X Y · Shift = Sprint · Enter = Start'));
   body.appendChild(foot);
 
   const closeBtn = el('button', 'cc-btn cc-modal-close-btn cc-focus', 'GOT IT!');

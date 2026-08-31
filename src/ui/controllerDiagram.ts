@@ -140,8 +140,9 @@ export function controllerDiagramSVG(): string {
   };
 
   const callouts = `
-  ${callout(px(cx - 108), py(cy - 34), 196, 96, 'LEFT STICK', 'Move · Aim your shot', 'left', '#8fd0e8')}
-  ${callout(px(cx - 52), py(cy + 26), 196, 330, 'D-PAD', 'Navigate menus', 'left', '#c9c9d9')}
+  ${callout(px(cx - 140), py(cy - 96), 196, 62, 'LB — SPRINT', 'Hold to run · costs stamina', 'left', '#6ef0c8')}
+  ${callout(px(cx - 108), py(cy - 34), 196, 150, 'LEFT STICK', 'Move · Aim your shot', 'left', '#8fd0e8')}
+  ${callout(px(cx - 52), py(cy + 26), 196, 344, 'D-PAD', 'Navigate menus', 'left', '#c9c9d9')}
   ${callout(px(cx + 34), py(cy - 34), 466, 448, 'START', 'Pause the match', 'down', '#ff9d5c')}
 
   ${faceCallout(cx + 108, cy - 76, 768, 76, 'Y — FLAT POWER', 'or A+B together', Y)}

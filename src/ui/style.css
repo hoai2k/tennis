@@ -899,6 +899,10 @@
   flex-direction: column;
   align-items: center;
   gap: 4px;
+  /* a backdrop so the meters stay legible over a busy court */
+  padding: 7px 9px 6px;
+  border-radius: 16px;
+  background: rgba(14, 7, 30, 0.42);
 }
 .cc-charge-slot0 { left: 26px; }
 .cc-charge-slot1 { right: 26px; }
@@ -1434,3 +1438,23 @@
   color: #ff8f8f;
   border-color: rgba(255, 143, 143, 0.55);
 }
+
+/* sprint stamina bar under each charge ring */
+.cc-stamina {
+  width: 66px;
+  height: 9px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(10, 5, 22, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  overflow: hidden;
+}
+.cc-stamina-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #46d8ff 0%, #6ef0c8 100%);
+  transition: width 0.08s linear;
+}
+.cc-stamina-fill.cc-stamina-low { background: linear-gradient(90deg, #ffc23d 0%, #ffe27a 100%); }
+.cc-stamina-fill.cc-stamina-out { background: #ff5a5a; }
