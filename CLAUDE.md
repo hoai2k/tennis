@@ -4,7 +4,20 @@ Guidance for Claude Code when working in this repository.
 
 ## Project
 
-`tennismodels` — a static site served from `public/`, deployed automatically from the `main` branch. Because the deployed version is what gets tested, changes are only useful once they reach `main`.
+**Cursed Court** — a Vite + TypeScript + three.js tennis game, deployed
+automatically from the `main` branch. Because the deployed version is what gets
+tested, changes are only useful once they reach `main`.
+
+Deployment: `.github/workflows/deploy.yml` runs on every push to `main`, builds
+with `npm run build`, and publishes `dist/` to GitHub Pages.
+
+- Live site: https://hoai2k.github.io/tennis/
+- Static assets (models, music, images, portraits) live in `public/` and are
+  copied to the root of `dist/` by the build — reference them with paths
+  relative to the site root, e.g. `models/yuji.glb`, not `/public/models/...`.
+- `vite.config.ts` sets `base: './'` so the game works from the `/tennis/`
+  subpath. Keep it relative.
+- Never commit `dist/` — CI builds it.
 
 ## Merge policy: always merge to `main` when done
 

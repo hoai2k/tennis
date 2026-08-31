@@ -6,7 +6,12 @@ procedural 3D courts, stadiums, crowds, animation, and sound effects.
 
 ![Cursed Court](public/images/logo.png)
 
-## Play
+## ▶ Play now: **https://hoai2k.github.io/tennis/**
+
+Deployed automatically from `main` by
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) (GitHub Pages).
+
+## Run locally
 
 ```bash
 npm install

@@ -30,4 +30,10 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Production build passes
 - [x] Final commit, push, merge to main
 
-**Status: COMPLETE** — game is live on `main`.
+## Phase 4 — Deployment
+- [x] GitHub Actions workflow builds Vite app → GitHub Pages (`.github/workflows/deploy.yml`)
+- [x] GitHub Pages enabled; first deploy run succeeded
+- [x] Live site verified: bundle byte-identical to the locally play-tested build,
+      all 38 game assets (models/music/portraits/images) return 200
+
+**Status: COMPLETE** — merged to `main` and live at https://hoai2k.github.io/tennis/
