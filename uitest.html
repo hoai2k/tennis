@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cursed Court — UI test</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
+      #app { position: relative; width: 100vw; height: 100vh; }
+      /* stand-in for the 3D scene so transparent overlays read correctly */
+      #fake-court {
+        position: absolute; inset: 0;
+        background: linear-gradient(180deg, #ffb46a 0%, #ff8a5a 26%, #274b7e 26.2%, #2f5f9e 46%, #2a6ad4 46.2%, #2f6fc4 100%);
+      }
+      #fake-court::before {
+        /* court surface */
+        content: "";
+        position: absolute; left: 50%; top: 58%;
+        width: 74vw; height: 38vh;
+        transform: translateX(-50%) perspective(700px) rotateX(48deg);
+        background: #2f6fc4;
+        border: 6px solid #fff;
+        box-shadow: 0 0 0 8vw #3fa66b;
+        outline: 4px solid rgba(255,255,255,0.35);
+      }
+      #fake-court::after {
+        /* net */
+        content: "";
+        position: absolute; left: 50%; top: 63%;
+        width: 52vw; height: 7vh;
+        transform: translateX(-50%);
+        background:
+          repeating-linear-gradient(90deg, rgba(255,255,255,0.5) 0 2px, transparent 2px 8px),
+          repeating-linear-gradient(0deg, rgba(255,255,255,0.5) 0 2px, transparent 2px 8px),
+          rgba(20,24,34,0.55);
+        border-top: 5px solid #eee;
+      }
+      #ui-root { position: absolute; inset: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="fake-court"></div>
+      <div id="ui-root"></div>
+    </div>
+    <script type="module" src="/src/ui/devTest.ts"></script>
+  </body>
+</html>

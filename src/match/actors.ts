@@ -1,0 +1,133 @@
+import * as THREE from 'three';
+import { COURT, PLAYER_BASE_SPEED } from '../core/constants';
+import type { Avatar, PadState, ShotKind, SwingSide } from '../core/types';
+
+/* An actor = one character on court (human- or AI-controlled).
+ * The controller fills `intent` each frame; the actor integrates movement,
+ * charge state and animation. The MatchController resolves ball contact. */
+
+export interface ActorIntent {
+  moveX: number; // world-space desired dir (screen-space == world-space here)
+  moveZ: number;
+  /** shot button newly pressed this frame ('' = none) */
+  shotPressed: 'a' | 'b' | 'x' | 'y' | '';
+  aimX: number; // -1..1
+  aimY: number;
+}
+
+const COMBO_WINDOW = 0.24;
+
+export class Actor {
+  readonly pos: THREE.Vector3;
+  vel = new THREE.Vector3();
+  charging = false;
+  chargeTime = 0;
+  chargeKind: ShotKind = 'topspin';
+  chargeSide: SwingSide = 'fore';
+  private comboT = 0;
+  private firstBtn: 'a' | 'b' | 'x' | 'y' | '' = '';
+  swingLock = 0; // seconds until able to act after a swing
+  intent: ActorIntent = { moveX: 0, moveZ: 0, shotPressed: '', aimX: 0, aimY: 0 };
+  readonly maxSpeed: number;
+  readonly reach: number;
+  readonly powerMul: number;
+  readonly spinMul: number;
+  /** pad for rumble (humans only) */
+  pad: PadState | null = null;
+
+  constructor(
+    readonly avatar: Avatar,
+    readonly slot: number,
+    readonly team: 0 | 1,
+    readonly isHuman: boolean,
+  ) {
+    const st = avatar.def.stats;
+    this.maxSpeed = PLAYER_BASE_SPEED * (0.82 + st.speed * 0.09);
+    this.reach = 1.55 + st.reach * 0.14;
+    this.powerMul = 0.88 + st.power * 0.055;
+    this.spinMul = 0.7 + st.spin * 0.12;
+    this.pos = avatar.root.position;
+    // face the net
+    avatar.root.rotation.y = team === 0 ? Math.PI : 0;
+  }
+
+  /** +1 when this actor's shots travel toward -z (team0), else -1 */
+  get dir(): 1 | -1 { return this.team === 0 ? 1 : -1; }
+
+  /** forehand is on world +x for team0 (facing -z), world -x for team1 */
+  sideForBallX(ballX: number): SwingSide {
+    const rightWorld = this.team === 0 ? 1 : -1;
+    return Math.sign(ballX - this.pos.x) * rightWorld >= 0 ? 'fore' : 'back';
+  }
+
+  beginCharge(btn: 'a' | 'b' | 'x' | 'y', side: SwingSide): void {
+    this.charging = true;
+    this.chargeTime = 0;
+    this.comboT = COMBO_WINDOW;
+    this.firstBtn = btn;
+    this.chargeKind = btn === 'a' ? 'topspin' : btn === 'b' ? 'slice' : btn === 'x' ? 'lob' : 'flat';
+    this.chargeSide = side;
+    this.avatar.startCharge(side);
+  }
+
+  /** second button press while charging → combo shots */
+  comboPress(btn: 'a' | 'b' | 'x' | 'y'): void {
+    if (!this.charging || btn === this.firstBtn) return;
+    if (this.comboT > 0) {
+      if (this.firstBtn === 'a' && btn === 'b') this.chargeKind = 'drop';
+      else if (this.firstBtn === 'b' && btn === 'a') this.chargeKind = 'lob';
+      else if ((this.firstBtn === 'a' && btn === 'y') || (this.firstBtn === 'y' && btn === 'a')) this.chargeKind = 'flat';
+    }
+  }
+
+  cancelCharge(): void {
+    if (!this.charging) return;
+    this.charging = false;
+    this.chargeTime = 0;
+    this.avatar.cancelCharge();
+  }
+
+  /** charge power 0..1 (fills in ~1s) */
+  get charge(): number { return Math.min(1, this.chargeTime / 1.0); }
+
+  update(dt: number): void {
+    if (this.swingLock > 0) this.swingLock -= dt;
+    if (this.charging) {
+      this.chargeTime += dt;
+      if (this.comboT > 0) this.comboT -= dt;
+    }
+
+    // movement: full speed normally, slowed while charging, frozen mid-swing
+    const speedMul = this.avatar.isSwinging() ? 0.15 : this.charging ? 0.5 : 1;
+    const target = new THREE.Vector3(this.intent.moveX, 0, this.intent.moveZ);
+    if (target.lengthSq() > 1) target.normalize();
+    target.multiplyScalar(this.maxSpeed * speedMul);
+    const accel = 34;
+    this.vel.x = THREE.MathUtils.damp(this.vel.x, target.x, accel / this.maxSpeed, dt);
+    this.vel.z = THREE.MathUtils.damp(this.vel.z, target.z, accel / this.maxSpeed, dt);
+    this.pos.x += this.vel.x * dt;
+    this.pos.z += this.vel.z * dt;
+
+    // clamp to own side + runoff
+    const xLim = COURT.widthDoubles / 2 + 3.2;
+    this.pos.x = THREE.MathUtils.clamp(this.pos.x, -xLim, xLim);
+    const zNear = 0.9, zFar = COURT.halfLength + COURT.runoff - 1.5;
+    if (this.team === 0) this.pos.z = THREE.MathUtils.clamp(this.pos.z, zNear, zFar);
+    else this.pos.z = THREE.MathUtils.clamp(this.pos.z, -zFar, -zNear);
+
+    // animation: convert world vel to avatar-local (team0 faces -z ⇒ local +x = world -x? avatar faces +z at yaw 0; yaw π flips x and z)
+    const spd = Math.hypot(this.vel.x, this.vel.z);
+    const f = this.team === 0 ? -1 : 1;
+    if (spd > 0.05) {
+      this.avatar.setMovement(spd, (this.vel.x / spd) * f, (this.vel.z / spd) * f);
+    } else {
+      this.avatar.setMovement(0, 0, 0);
+    }
+    this.avatar.update(dt);
+  }
+
+  teleport(x: number, z: number): void {
+    this.pos.set(x, 0, z);
+    this.vel.set(0, 0, 0);
+  }
+}
