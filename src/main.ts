@@ -197,6 +197,16 @@ const params = new URLSearchParams(location.search);
   get state() { return state; },
   get match() { return match; },
   ui, input, audio,
+  /** advance the simulation synchronously (headless testing — rendering
+   *  still happens on the next rAF) */
+  fastForward(seconds: number) {
+    const h = 1 / 60;
+    for (let t = 0; t < seconds; t += h) {
+      input.update(h);
+      match?.update(h);
+      if (match) stadium.update(h, match.excitement);
+    }
+  },
   async demoMatch(mode: 'singles' | 'doubles' = 'singles', themeId = 'shibuya') {
     chosenMode = mode;
     const ids: CharacterId[] = mode === 'singles' ? ['yuji', 'din'] : ['yuji', 'megumi', 'din', 'bossk'];

@@ -83,10 +83,18 @@ if (!portrait) {
 }
 
 // ---- camera framing ----
-const yaw = THREE.MathUtils.degToRad(parseFloat(params.get('yaw') ?? (portrait ? '30' : '25')));
-const pitch = THREE.MathUtils.degToRad(parseFloat(params.get('pitch') ?? (portrait ? '-8' : '8')));
-const dist = parseFloat(params.get('dist') ?? (portrait ? '2.1' : '4.2'));
-const targetY = parseFloat(params.get('ty') ?? (portrait ? '1.18' : '0.95'));
+const heightGuess = (() => {
+  try {
+    return characterById(charId).height;
+  } catch {
+    return 1.75;
+  }
+})();
+// portrait: heroic 3/4 view, slightly low camera looking up, head+torso framing
+const yaw = THREE.MathUtils.degToRad(parseFloat(params.get('yaw') ?? (portrait ? '32' : '25')));
+const pitch = THREE.MathUtils.degToRad(parseFloat(params.get('pitch') ?? (portrait ? '10' : '8')));
+const dist = parseFloat(params.get('dist') ?? (portrait ? String(heightGuess * 1.32) : '4.2'));
+const targetY = parseFloat(params.get('ty') ?? (portrait ? String(heightGuess * 0.62) : '0.95'));
 camera.position.set(
   Math.sin(yaw) * Math.cos(pitch) * dist,
   targetY + Math.sin(-pitch) * dist,

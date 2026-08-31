@@ -162,6 +162,28 @@ export class Rig {
     }
 
     const canonOf = new Map<THREE.Object3D, THREE.Quaternion>();
+    const ROT_Y_180 = new THREE.Quaternion(0, 1, 0, 0);
+    // Legs only: arm binds are consistent across the roster, and a stable
+    // hand frame is required for the racquet grip. Leg rolls DO vary
+    // (nobara's are flipped 180°) and only affect the mesh, not gameplay.
+    const LIMB_KEYS = new Set<BoneKey>([
+      'thighL', 'thighR', 'shinL', 'shinR', 'footL', 'footR', 'toeL', 'toeR',
+    ]);
+    /** Some models bind limb bones with the roll flipped 180° relative to
+     *  ig11's convention (e.g. nobara's legs). Compare the model's rest roll
+     *  (after aligning bone directions) with the canonical roll and mirror
+     *  the canonical frame when they disagree — authored poses stay valid
+     *  because offsets are conjugated in character space, not bone space. */
+    const matchRoll = (q: THREE.Quaternion, node: THREE.Object3D): THREE.Quaternion => {
+      const restWorld = node.getWorldQuaternion(new THREE.Quaternion());
+      const restY = new THREE.Vector3(0, 1, 0).applyQuaternion(restWorld);
+      const canonY = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+      const arc = new THREE.Quaternion().setFromUnitVectors(restY, canonY);
+      const alignedX = new THREE.Vector3(1, 0, 0).applyQuaternion(restWorld).applyQuaternion(arc);
+      const canonX = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+      if (alignedX.dot(canonX) < 0) q.multiply(ROT_Y_180);
+      return q;
+    };
     const computeCanon = (node: THREE.Object3D, parentCanon: THREE.Quaternion) => {
       const key = keyByBone.get(node);
       let n: THREE.Quaternion;
@@ -177,9 +199,10 @@ export class Rig {
           );
           const ry = THREE.MathUtils.clamp(restDir.y, -0.95, isToe ? 0.2 : 0);
           const rz = Math.sqrt(Math.max(0.001, 1 - ry * ry));
-          n = basisQuat([[isToe ? -1 : 1, 0, 0], [0, ry, rz], [0, 0, 0]]);
+          n = matchRoll(basisQuat([[isToe ? -1 : 1, 0, 0], [0, ry, rz], [0, 0, 0]]), node);
         } else {
           n = basisQuat(CANON[key]);
+          if (LIMB_KEYS.has(key)) n = matchRoll(n, node);
         }
       } else if (/^DEF-(thigh|shin|upper_arm|forearm)[LR]001$/.test(node.name)) {
         // twist/secondary segments: align exactly with their primary bone —
@@ -251,10 +274,16 @@ export class Rig {
     return this.recByKey.get(key)?.bone;
   }
 
-  /** canonical char-space orientation of a bone (the pose-space basis) */
+  /** canonical char-space orientation of a bone (the pose-space basis),
+   *  as actually used for THIS model (may be roll-flipped vs the reference) */
   canonQuat(key: BoneKey, out: THREE.Quaternion): THREE.Quaternion {
     const r = this.recByKey.get(key);
     return r ? out.copy(r.post) : out.identity();
+  }
+
+  /** the shared reference canonical frame (ig11 convention, never flipped) */
+  static referenceCanon(key: BoneKey): THREE.Quaternion {
+    return basisQuat(CANON[key]);
   }
 
   applyNeutral(): void {

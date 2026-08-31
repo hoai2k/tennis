@@ -46,13 +46,16 @@ export function computeTarget(
 }
 
 /**
- * Solve launch velocity from -> target with given profile speed and net clearance.
- * powerMul scales speed (charge). Returns { vel, sidespin, flightTime }.
+ * Solve launch velocity from -> target with given profile speed and net
+ * clearance. powerMul scales speed (charge); `sidespin` must be the exact
+ * value that will be passed to Ball.launch — the solver compensates for the
+ * lateral/vertical magnus drift the ball integrator will apply, so shots
+ * actually land on their targets.
  */
 export function solveShot(
   from: THREE.Vector3, target: THREE.Vector3, kind: ShotKind,
-  powerMul: number, aimX: number,
-): { vel: THREE.Vector3; sidespin: number; time: number } {
+  powerMul: number, sidespin: number,
+): { vel: THREE.Vector3; time: number } {
   const p = SHOT_PROFILES[kind];
   const speed = SHOT_BASE_SPEED * p.speed * powerMul;
   const dx = target.x - from.x;
@@ -61,19 +64,22 @@ export function solveShot(
   let T = Math.max(0.28, horiz / speed);
 
   const g = GRAVITY;
+  // magnus accelerations the ball integrator applies (see Ball.step)
+  const spinY = kind === 'topspin' || kind === 'star' ? 1 : kind === 'slice' || kind === 'drop' ? -0.8 : 0;
+  const ax = sidespin * 6;
+  const ay = spinY * -5.5;
   let vel = new THREE.Vector3();
   for (let i = 0; i < 14; i++) {
-    const vy = (target.y - from.y - 0.5 * g * T * T) / T;
-    vel.set(dx / T, vy, dz / T);
+    const vy = (target.y - from.y - 0.5 * (g + ay) * T * T) / T;
+    vel.set(dx / T - 0.5 * ax * T, vy, dz / T);
     // net clearance check at z=0
     if (Math.sign(from.z) !== Math.sign(target.z) && Math.abs(from.z) > 0.05) {
       const tNet = Math.abs(from.z) / Math.abs(dz / T);
-      const yNet = from.y + vy * tNet + 0.5 * g * tNet * tNet;
+      const yNet = from.y + vy * tNet + 0.5 * (g + ay) * tNet * tNet;
       const need = COURT.netHeightCenter + 0.12 + p.clearance;
       if (yNet < need) { T *= 1.09; continue; }
     }
     break;
   }
-  const sidespin = aimX * p.curve;
-  return { vel, sidespin, time: T };
+  return { vel, time: T };
 }

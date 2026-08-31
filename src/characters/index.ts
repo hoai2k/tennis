@@ -54,12 +54,8 @@ class AvatarImpl implements Avatar {
     this.racquet = buildRacquet(def.color);
     const handR = this.rig.boneOf('handR');
     if (handR) {
-      const ws = handR.getWorldScale(new THREE.Vector3());
-      const inv = 1 / Math.max(1e-6, ws.y);
-      this.racquet.group.scale.setScalar(inv);
-      this.racquet.group.position.copy(RACQUET_POS).multiplyScalar(inv);
-      this.racquet.group.quaternion.setFromEuler(RACQUET_EULER);
       handR.add(this.racquet.group);
+      this.placeRacquet(RACQUET_EULER, RACQUET_POS);
     } else {
       // fall back: strap it to the container so the game still works
       container.add(this.racquet.group);
@@ -132,15 +128,27 @@ class AvatarImpl implements Avatar {
     return this.animator;
   }
 
-  /** dev-only: retune racquet placement in the hand frame (degrees / meters) */
-  debugRacquet(rx: number, ry: number, rz: number, px = RACQUET_POS.x, py = RACQUET_POS.y, pz = RACQUET_POS.z): void {
+  /** Place the racquet in the hand-bone frame. The pose/euler constants are
+   *  authored against the REFERENCE hand frame; a per-model correction maps
+   *  them into the actual (possibly roll-flipped) hand frame. */
+  private placeRacquet(euler: THREE.Euler, pos: THREE.Vector3): void {
     const handR = this.rig.boneOf('handR');
     if (!handR) return;
     const ws = handR.getWorldScale(new THREE.Vector3());
     const inv = 1 / Math.max(1e-6, ws.y);
-    this.racquet.group.position.set(px, py, pz).multiplyScalar(inv);
-    this.racquet.group.quaternion.setFromEuler(new THREE.Euler(
-      THREE.MathUtils.degToRad(rx), THREE.MathUtils.degToRad(ry), THREE.MathUtils.degToRad(rz), 'YXZ'));
+    const corr = this.rig.canonQuat('handR', new THREE.Quaternion()).invert()
+      .multiply(Rig.referenceCanon('handR'));
+    this.racquet.group.scale.setScalar(inv);
+    this.racquet.group.position.copy(pos).applyQuaternion(corr).multiplyScalar(inv);
+    this.racquet.group.quaternion.copy(corr).multiply(new THREE.Quaternion().setFromEuler(euler));
+  }
+
+  /** dev-only: retune racquet placement in the hand frame (degrees / meters) */
+  debugRacquet(rx: number, ry: number, rz: number, px = RACQUET_POS.x, py = RACQUET_POS.y, pz = RACQUET_POS.z): void {
+    this.placeRacquet(
+      new THREE.Euler(THREE.MathUtils.degToRad(rx), THREE.MathUtils.degToRad(ry), THREE.MathUtils.degToRad(rz), 'YXZ'),
+      new THREE.Vector3(px, py, pz),
+    );
   }
 
   dispose(): void {

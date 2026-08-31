@@ -14,6 +14,11 @@ export class AiBrain {
   private plannedBtn: 'a' | 'b' | 'x' | 'y' = 'a';
   private aim = { x: 0, y: 0.4 };
   private wobble = Math.random() * 100;
+  /** per-incoming-ball read error (m); rolled when a new ball comes our way */
+  private readErr = 0;
+  /** a fully blown read: runs to the wrong spot and never swings */
+  private willMiss = false;
+  private wasIncoming = false;
 
   constructor(private actor: Actor) {}
 
@@ -27,6 +32,7 @@ export class AiBrain {
     partner: Actor | null;
     fx: MatchFx;
     singles: boolean;
+    rallyLen: number;
   }): void {
     const a = this.actor;
     const it = a.intent;
@@ -37,6 +43,19 @@ export class AiBrain {
     const ball = ctx.ball;
     const towardUs = ctx.ballLive && Math.sign(ball.vel.z) === Math.sign(a.dir) && ball.active;
 
+    // roll a fresh "read" when a new ball starts coming our way; longer
+    // rallies breed bigger mistakes so points actually end (Mario-Tennis CPU feel)
+    const incoming = towardUs && ctx.myTeamMayHit;
+    if (incoming && !this.wasIncoming) {
+      const missChance = Math.min(0.45, 0.06 + ctx.rallyLen * 0.05);
+      this.willMiss = Math.random() < missChance;
+      this.readErr = this.willMiss
+        ? (1.4 + Math.random() * 1.2) * (Math.random() < 0.5 ? -1 : 1)
+        : (Math.random() - 0.5) * 0.5;
+      this.reactT = 0;
+    }
+    this.wasIncoming = incoming;
+
     if (ctx.ballLive && ctx.myTeamMayHit && ctx.iAmReceiver && towardUs) {
       this.reactT += dt;
       if (this.reactT > 0.18) {
@@ -45,12 +64,12 @@ export class AiBrain {
         const t = ball.predictLanding(land);
         if (t >= 0) {
           this.intercept.set(
-            land.x + ball.vel.x * 0.12,
+            land.x + ball.vel.x * 0.12 + this.readErr,
             0,
             land.z + Math.sign(a.dir) * 1.15, // stand a step behind the bounce
           );
         } else {
-          this.intercept.set(ball.pos.x, 0, a.pos.z);
+          this.intercept.set(ball.pos.x + this.readErr, 0, a.pos.z);
         }
         // chance-shot star on our side? go for it
         if (ctx.fx.starActive && Math.sign(ctx.fx.starPos.z) === Math.sign(a.dir)) {
@@ -61,8 +80,9 @@ export class AiBrain {
       if (this.hasIntercept) {
         this.moveToward(this.intercept, dt, 1);
         // start charging when ball is inbound and close-ish in time
+        // (a blown read never commits to the swing — the ball passes by)
         const dist = a.pos.distanceTo(ball.pos);
-        if (!a.charging && a.swingLock <= 0 && (dist < 7 || ball.pos.distanceTo(this.intercept) < 6)) {
+        if (!this.willMiss && !a.charging && a.swingLock <= 0 && (dist < 7 || ball.pos.distanceTo(this.intercept) < 6)) {
           this.chooseShot(ctx);
           it.shotPressed = this.plannedBtn;
           it.aimX = this.aim.x; it.aimY = this.aim.y;

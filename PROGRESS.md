@@ -6,13 +6,13 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Vite + TS + three scaffold, npm deps
 - [x] `src/core/types.ts` contracts
 - [x] Gamepad input manager (4 pads + keyboard fallback, menu nav events)
-- [~] Pre-render character portraits → `public/portraits/*.png` (chars agent)
+- [x] Pre-render character portraits → `public/portraits/*.png`
 
 ## Phase 1 — Parallel modules
-- [~] `src/world/` procedural stadium (agent: env — running)
-- [~] `src/characters/` loader + procedural animation (agent: chars — running)
-- [x] `src/audio/` music manager + procedural SFX (agent: audio — done, 31 SFX verified)
-- [~] `src/ui/` screens, HUD, icon buttons, controller diagram (agent: ui — running)
+- [x] `src/world/` procedural stadium (3 themes, crowd, confetti — verified)
+- [x] `src/characters/` loader + procedural animation (all 13 rigs, portraits — verified)
+- [x] `src/audio/` music manager + procedural SFX (31 SFX verified)
+- [x] `src/ui/` screens, HUD, icon buttons, controller diagram (verified at 720p/1080p)
 
 ## Phase 2 — Game core (lead)
 - [x] Ball physics + shot model (topspin/slice/flat/lob/drop, charge, star shots)
@@ -22,7 +22,12 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] State machine wiring all screens (`src/main.ts`)
 
 ## Phase 3 — Integration & polish
-- [ ] Full flow: title → menu → char select → court select → match → victory
-- [ ] Doubles (4 players), pad assignment
-- [ ] Playwright smoke test w/ mocked gamepad, screenshots reviewed
-- [ ] Production build passes; committed & pushed
+- [x] Full flow: title → menu → char select → court select → match → pause → resume (E2E verified)
+- [x] Generated artwork wired in (logo, favicon, title bg, court cards, victory burst)
+- [x] AI tuning: misread system so rallies end naturally (Mario-Tennis CPU feel)
+- [x] Shot solver compensates magnus drift (shots land on target)
+- [x] Singles + doubles sims to victory (0 console errors; deuce/Ad flow verified)
+- [x] Production build passes
+- [x] Final commit, push, merge to main
+
+**Status: COMPLETE** — game is live on `main`.

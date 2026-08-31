@@ -12,7 +12,7 @@ import { MatchFx } from './effects';
 import { Scorer } from './rules';
 import { Actor } from './actors';
 import { AiBrain } from './ai';
-import { computeTarget, solveShot } from './shots';
+import { SHOT_PROFILES, computeTarget, solveShot } from './shots';
 
 type Phase = 'intro' | 'servePrep' | 'serveToss' | 'serveFlight' | 'rally' | 'pointEnd' | 'victory' | 'done';
 
@@ -133,7 +133,8 @@ export class MatchController {
 
   private holdBallAtServer(): void {
     const p = this.server.pos;
-    this.ball.hold(new THREE.Vector3(p.x, 1.5, p.z));
+    // in the toss (left) hand: character left = world -x for team0, +x for team1
+    this.ball.hold(new THREE.Vector3(p.x - 0.33 * this.server.dir, 1.25, p.z));
   }
 
   private doToss(): void {
@@ -156,13 +157,14 @@ export class MatchController {
     const from = new THREE.Vector3(this.server.pos.x, Math.max(1.9, 1.5 + this.tossY), this.server.pos.z);
     const target = new THREE.Vector3(THREE.MathUtils.clamp(bx, -halfSingles + 0.3, halfSingles - 0.3), 0.05, bz);
     const power = this.server.powerMul * (0.82 + 0.38 * quality) * this.theme.ballSpeedMul;
-    const solved = solveShot(from, target, 'serve', power, aimX);
+    const serveSpin = aimX * 0.4 * sx;
+    const solved = solveShot(from, target, 'serve', power, serveSpin);
     this.server.avatar.serveHit(quality);
     this.tossActive = false;
     this.pending = null;
     // launch after the animation reaches contact
     this.schedule(SWING_CONTACT_DELAY, () => {
-      this.ball.launch(from, solved.vel, 'serve', solved.sidespin * sx);
+      this.ball.launch(from, solved.vel, 'serve', serveSpin);
       this.lastHitTeam = this.scorer.servingTeam;
       this.rallyHits = 0;
       this.phase = 'serveFlight';
@@ -243,7 +245,9 @@ export class MatchController {
 
   private handleDead(): void {
     if (this.phase === 'rally' && this.lastHitTeam !== -1) {
-      this.endPoint(this.lastHitTeam, 'WINNER!');
+      // never bounced ⇒ it sailed out on the full: hitter loses
+      if (this.ball.bounceCount === 0) this.endPoint((1 - this.lastHitTeam) as 0 | 1, 'OUT!');
+      else this.endPoint(this.lastHitTeam, 'WINNER!');
     } else if (this.phase === 'serveFlight') {
       this.serveFault();
     }
@@ -370,8 +374,9 @@ export class MatchController {
     const from = ball.pos.clone();
     from.y = Math.max(0.35, Math.min(from.y, 2.6));
     const target = computeTarget(p.kind, p.actor.dir, p.aimX, p.aimY, this.singles);
-    const solved = solveShot(from, target, p.kind, p.power, p.aimX);
-    ball.launch(from, solved.vel, p.kind, solved.sidespin * p.actor.spinMul * -p.actor.dir);
+    const sidespin = p.aimX * SHOT_PROFILES[p.kind].curve * p.actor.spinMul * -p.actor.dir;
+    const solved = solveShot(from, target, p.kind, p.power, sidespin);
+    ball.launch(from, solved.vel, p.kind, sidespin);
     this.lastHitTeam = p.actor.team;
     this.rallyHits++;
     this.excitement = Math.min(1, 0.3 + this.rallyHits * 0.05);
@@ -470,6 +475,12 @@ export class MatchController {
       if (this.pending.t <= 0) this.launchPending();
     }
 
+    // retire balls that left the stadium area; resolve the point if still live
+    if (this.ball.active && (Math.abs(this.ball.pos.x) > 16 || Math.abs(this.ball.pos.z) > 19)) {
+      this.ball.active = false;
+      this.handleDead();
+    }
+
     // actors
     this.driveIntents(dt);
     for (const a of this.actors) a.update(dt);
@@ -553,6 +564,7 @@ export class MatchController {
           partner: this.teamActors(a.team).find((x) => x !== a) ?? null,
           fx: this.fx,
           singles: this.singles,
+          rallyLen: this.rallyHits,
         });
       }
     }

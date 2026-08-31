@@ -27,7 +27,8 @@ export class Scorer {
   }
 
   get isFinalGame(): boolean {
-    return this.games[0] === this.gamesToWin - 1 && this.games[1] === this.gamesToWin - 1;
+    return this.gamesToWin > 1
+      && this.games[0] === this.gamesToWin - 1 && this.games[1] === this.gamesToWin - 1;
   }
 
   /** true when the next point could decide the match for `team` */
