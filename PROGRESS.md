@@ -44,3 +44,15 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Height-adaptive swings: crouch for low balls, reach for high (racquet tracks requested height ~linearly, per-kind calibrated baselines)
 - [x] Mario Tennis parity: double-tap same button boosts charge; charge fills in 0.8s; volleys, combos, stars, power serves all verified present
 - [x] Frozen-frame visual verification of hits from the gameplay camera
+
+## Phase 6 — Court expansion (8 themes + Random)
+- [x] 5 new court themes: Jujutsu High Lawn (JJK grass + sakura + torii/pagoda),
+      Dune Sea (Tatooine twin-sun sand + sandcrawler + vaporators),
+      Mandalore Dome (beskar deck + shattered domes + mist),
+      Mayhem Foundry (Mech Mayhem iron plates + chimneys + molten horizon),
+      Neon Circuit (Mech Mayhem navy/cyan night arena)
+- [x] Per-theme banner texts (mech names, MOS EISLEY CUP, etc.)
+- [x] Court select: RANDOM card first (default) → rolls a real theme at PLAY;
+      9-card wrapped grid layout
+- [x] World viewer keys 1-8; smoke-tested demo match on circuit (0 errors)
+- [ ] Preview art for the 6 new cards (see image-requests.md)

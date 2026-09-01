@@ -28,6 +28,7 @@ export const STEP_H = 0.58;
 export const STEP_D = 1.2;
 export const STAND_BASE = 0.7; // top of first row = STAND_BASE + STEP_H
 
+/** classic set, used when the palette doesn't bring its own */
 const BANNER_TEXTS = [
   'CURSED COURT',
   'SHIBUYA OPEN',
@@ -80,7 +81,7 @@ export function buildStands(palette: ThemePalette, rand: () => number): StandsBu
   railGeos.forEach((g) => g.dispose());
 
   // ---------- banners on the inner wall faces ----------
-  const bannerMats = BANNER_TEXTS.map(
+  const bannerMats = (palette.bannerTexts ?? BANNER_TEXTS).map(
     (t) =>
       new THREE.MeshBasicMaterial({
         map: bannerTexture(t, palette.bannerBg, palette.bannerText, palette.bannerOutline),

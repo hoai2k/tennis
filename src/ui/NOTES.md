@@ -7,6 +7,10 @@
   (`COURT_LOOKS`, keyed by theme id, with a neutral fallback for unknown ids).
   If themes ever need to drive visuals from data, consider adding
   `colors`/`blurb` to `CourtThemeDef`.
+- **Court select prepends a RANDOM card** (index 0, the default selection).
+  It is purely a UI construct: on PLAY it rolls one of the real themes and
+  `onCourtConfirmed` always receives a real `CourtThemeDef`. With 5+ cards
+  the row wraps into a compact grid (`cc-court-cards-many`).
 - **No "back" callbacks exist in `UiCallbacks`** (e.g. char select → main
   menu). The UI navigates internally: main menu ⇄ title, char select → main
   menu, court select → main menu (on `back`). If the game keeps its own state

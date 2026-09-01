@@ -3,16 +3,15 @@ import type { CourtTheme } from '../core/types';
 import { createStadium, themeDefs } from './stadium';
 
 /* Dev-only viewer for the stadium (worldviewer.html).
- *   ?theme=shibuya|nevarro|night   pick theme
- *   ?ex=0..1                       crowd excitement
- * Keys: c = cheer, b = BIG cheer (confetti), 1/2/3 = switch theme.
+ *   ?theme=<id>   pick theme (any id from themeDefs())
+ *   ?ex=0..1      crowd excitement
+ * Keys: c = cheer, b = BIG cheer (confetti), 1..9 = switch theme.
  * Drag to orbit, wheel to zoom. */
 
+const THEME_IDS = themeDefs().map((t) => t.id);
 const params = new URLSearchParams(location.search);
 const themeParam = params.get('theme') ?? 'shibuya';
-const theme: CourtTheme = (['shibuya', 'nevarro', 'night'] as const).includes(
-  themeParam as CourtTheme
-)
+const theme: CourtTheme = THEME_IDS.includes(themeParam as CourtTheme)
   ? (themeParam as CourtTheme)
   : 'shibuya';
 const excitement = Math.min(1, Math.max(0, parseFloat(params.get('ex') ?? '0.4')));
@@ -82,9 +81,8 @@ window.addEventListener('wheel', (e) => {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'c') stadium.cheer(false);
   if (e.key === 'b') stadium.cheer(true);
-  if (e.key === '1') location.search = '?theme=shibuya';
-  if (e.key === '2') location.search = '?theme=nevarro';
-  if (e.key === '3') location.search = '?theme=night';
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= THEME_IDS.length) location.search = `?theme=${THEME_IDS[n - 1]}`;
 });
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -97,7 +95,7 @@ const help = document.createElement('div');
 help.style.cssText =
   'position:fixed;left:10px;bottom:10px;color:#fff;font:12px monospace;' +
   'background:rgba(0,0,0,.45);padding:6px 10px;border-radius:6px;z-index:10';
-help.textContent = `theme=${theme} | drag=orbit wheel=zoom | c=cheer b=BIG cheer | 1/2/3 switch theme`;
+help.textContent = `theme=${theme} | drag=orbit wheel=zoom | c=cheer b=BIG cheer | 1-${THEME_IDS.length} switch theme`;
 document.body.appendChild(help);
 
 const clock = new THREE.Clock();
