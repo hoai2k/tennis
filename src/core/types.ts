@@ -252,7 +252,9 @@ export interface GameSettings {
   crowdDensity: 'full' | 'light';
   /** Mech Mayhem characters: load the *_rig.glb humanoid re-rigs and drive
    *  them with the procedural tennis animator instead of their original
-   *  fighting-game clips */
+   *  fighting-game clips. On by default — the procedural animator gives
+   *  proper tennis form (real ready stance, charge wind-up, frame-exact
+   *  contact) that the repurposed fighting-game clips can't match. */
   humanoidRigs: boolean;
 }
 
@@ -262,5 +264,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
   muted: false,
   rumble: true,
   crowdDensity: 'full',
-  humanoidRigs: false,
+  humanoidRigs: true,
 };

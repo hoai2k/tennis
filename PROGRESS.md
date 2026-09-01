@@ -98,8 +98,9 @@ Status legend: [ ] todo · [~] in progress · [x] done
       quill-fan flare, frogger smash/serve uses the groundPound leap apex,
       nullbot smash timed to the heavy wind-through peak — every stroke on
       every mech contacts at proper height
-- [x] "MECH RIGS: ORIGINAL / HUMANOID" setting (persisted); HUMANOID loads
-      *_rig.glb re-rigs driven by the procedural tennis animator
+- [x] "MECH RIGS: ORIGINAL / HUMANOID" setting (persisted, HUMANOID is the
+      default); HUMANOID loads *_rig.glb re-rigs driven by the procedural
+      tennis animator
 - [x] Personality flavors for the humanoid path (konga knuckle stance +
       chest-beat, titanus stomps, fenrir lope, vulcan gun-platform bearing)
 - [x] Verified: humanoid singles to victory (konga_rig/titanus_rig,
