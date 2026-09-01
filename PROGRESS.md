@@ -80,3 +80,14 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Missing/failed track skips instantly instead of stalling the playlist
 - [x] Verified all 8 courts over 40-track runs + a live in-match fetch
 - [x] Mayhem Foundry 1 added — all 8 courts now have their own theme(s)
+
+## Phase 9 — Titanus (20 characters)
+- [x] Titanus ("The Iron Avalanche") added from Mech Mayhem; official
+      colors pulled from the source game (#ffa832 amber)
+- [x] Its own move mapping: punchHold1/2 charge -> punchRelease1/2 swings,
+      throwHeave lob, fistLaunch (Rocket Fist) star, poundSlam overhead
+- [x] CLIP_HIT_FRAC per-clip strike timing (poundSlam smash/serve now
+      contacts at the top of the raise, 2.63m, instead of past the floor)
+- [x] Char select is now exactly 3 rows of 7 (20 roster + Random)
+- [x] Verified: singles to victory (titanus/konga, foundry), doubles mixing
+      mechs with the older roster (circuit), all 7 mechs regression-checked

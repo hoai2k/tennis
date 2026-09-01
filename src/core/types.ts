@@ -11,7 +11,7 @@ import type * as THREE from 'three';
 export type CharacterId =
   | 'yuji' | 'megumi' | 'nobara' | 'maki' | 'naoya' | 'jogo' | 'mahito'
   | 'din' | 'ig11' | 'bossk' | 'tusken' | 'quarren' | 'duelist'
-  | 'konga' | 'saurion' | 'nullbot' | 'fenrir' | 'frogger' | 'vulcan';
+  | 'titanus' | 'konga' | 'saurion' | 'nullbot' | 'fenrir' | 'frogger' | 'vulcan';
 
 export type Series = 'jjk' | 'mandalorian' | 'mechmayhem';
 

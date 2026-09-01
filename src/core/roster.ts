@@ -60,6 +60,10 @@ export const ROSTER: CharacterDef[] = [
     stats: { power: 3, speed: 4, spin: 4, reach: 2 },
     tagline: 'The fastest draw is now the fastest volley.' },
   // --- Mech Mayhem (clip-animated robot rigs — see characters/clipAvatar.ts) ---
+  { id: 'titanus', name: 'Titanus', series: 'mechmayhem', style: 'power',
+    model: 'models/titanus.glb', height: 2.5, color: '#ffa832',
+    stats: { power: 5, speed: 1, spin: 2, reach: 4 },
+    tagline: 'The Iron Avalanche. Rocket-fist winners.' },
   { id: 'konga', name: 'Konga', series: 'mechmayhem', style: 'power',
     model: 'models/konga.glb', height: 2.45, color: '#d98a2a',
     stats: { power: 5, speed: 2, spin: 1, reach: 5 },

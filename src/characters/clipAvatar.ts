@@ -25,14 +25,16 @@ import { buildRacquet, type Racquet } from './racquet';
 const CLIP_PICKS: Record<string, string[]> = {
   idle: ['battleIdle', 'walk'],
   run: ['run', 'walk'],
-  charge: ['crouch', 'block', 'battleIdle'],
+  // titanus holds a cocked fist that its punchRelease swings finish
+  chargeFore: ['punchHold1', 'crouch', 'block', 'battleIdle'],
+  chargeBack: ['punchHold2', 'crouch', 'block', 'battleIdle'],
   // konga: bigPunch1 is the LEFT fist — bigPunch2 leads with the racquet hand
-  swingFore: ['light1', 'bigPunch2', 'saurionClawR', 'light3', 'heavy'],
-  swingBack: ['light2', 'bigPunch1', 'saurionClawL', 'light3', 'heavy'],
-  swingLob: ['kongaLob', 'light3', 'heavy'],
-  overhead: ['heavy', 'kongaSlam', 'groundPound'],
+  swingFore: ['punchRelease1', 'light1', 'bigPunch2', 'saurionClawR', 'light3', 'heavy'],
+  swingBack: ['punchRelease2', 'light2', 'bigPunch1', 'saurionClawL', 'light3', 'heavy'],
+  swingLob: ['throwHeave', 'kongaLob', 'light3', 'heavy'],
+  overhead: ['poundSlam', 'heavy', 'kongaSlam', 'groundPound'],
   star: [
-    'kongaSlam', 'saurionBite', 'nullBackhand', 'fenrirSpike',
+    'fistLaunch', 'kongaSlam', 'saurionBite', 'nullBackhand', 'fenrirSpike',
     'vulcanSpray', 'burst', 'hurricaneSpin', 'heavy',
   ],
   serveToss: ['castRaise', 'crouch', 'taunt'],
@@ -42,6 +44,13 @@ const CLIP_PICKS: Record<string, string[]> = {
 
 /** estimated fraction of an attack clip where the hit lands */
 const HIT_FRAC = 0.38;
+
+/** clips whose strike lands somewhere other than the usual ~38% in.
+ *  titanus' poundSlam raises fast and slams late, so at the default
+ *  fraction the racquet was already through the floor at contact. */
+const CLIP_HIT_FRAC: Record<string, number> = {
+  poundSlam: 0.19,
+};
 
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
@@ -225,7 +234,8 @@ export class ClipAvatar implements Avatar {
 
   /** timeScale that puts the clip's hit frame at SWING_CONTACT_DELAY */
   private swingTimeScale(clip: THREE.AnimationClip): number {
-    return THREE.MathUtils.clamp((clip.duration * HIT_FRAC) / SWING_CONTACT_DELAY, 1.2, 4.0);
+    const frac = CLIP_HIT_FRAC[clip.name] ?? HIT_FRAC;
+    return THREE.MathUtils.clamp((clip.duration * frac) / SWING_CONTACT_DELAY, 1.2, 4.0);
   }
 
   private playSwingClip(clip: THREE.AnimationClip): void {
@@ -268,10 +278,10 @@ export class ClipAvatar implements Avatar {
     }
   }
 
-  startCharge(_side: SwingSide): void {
+  startCharge(side: SwingSide): void {
     if (this.charging) return;
     this.charging = true;
-    const clip = this.pick('charge');
+    const clip = this.pick(side === 'back' ? 'chargeBack' : 'chargeFore');
     if (clip) this.playOverride(clip, { loop: true, timeScale: 0.9, fade: 0.12 });
   }
 
