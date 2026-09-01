@@ -68,3 +68,15 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Char select: 3-row grid nav (20 tiles), Mech Mayhem series styling
 - [x] Verified: full singles match to victory (konga/vulcan, foundry) and
       doubles (saurion/nullbot/fenrir/frogger, circuit) — 0 console errors
+
+## Phase 8 — Per-court soundtracks
+- [x] 11 new music tracks wired to their courts (uploaded by hoai2k):
+      Shibuya Hard Court 1-2, Moonlit Match Point 1-2 (Cursed Night),
+      Jujutsu High Lawn 1-2, Nevarro Clay 1-2, Dune Sea Rally 1,
+      Mandalore Dome 1, Neon Circuit 1
+- [x] Gameplay music: court's own theme(s) once each, then an endless
+      shuffle of house tracks + that court's themes (no adjacent repeats)
+- [x] `setMusic(mode, court?)`; a new court restarts gameplay music
+- [x] Missing/failed track skips instantly instead of stalling the playlist
+- [x] Verified all 8 courts over 40-track runs + a live in-match fetch
+- [ ] Mayhem Foundry has no track yet — opens on Cursed Court Rally 2

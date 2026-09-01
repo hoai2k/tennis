@@ -11,7 +11,7 @@
  * routed through an sfx bus gain (see sfx.ts).
  * ============================================================ */
 
-import type { AudioApi, GameSettings, MusicMode, SfxName, SfxOpts } from '../core/types';
+import type { AudioApi, CourtTheme, GameSettings, MusicMode, SfxName, SfxOpts } from '../core/types';
 import { MusicManager } from './music';
 import { SfxEngine } from './sfx';
 
@@ -77,8 +77,8 @@ export function createAudio(initial: GameSettings): AudioApi {
   return {
     unlock,
 
-    setMusic(mode: MusicMode): void {
-      music.setMode(mode);
+    setMusic(mode: MusicMode, court?: CourtTheme): void {
+      music.setMode(mode, court);
     },
 
     sfx(name: SfxName, opts?: SfxOpts): void {

@@ -11,6 +11,7 @@
 import { createAudio } from './index';
 import { buildSfx, SFX_NAMES } from './sfx';
 import { DEFAULT_SETTINGS, type MusicMode, type SfxName } from '../core/types';
+import { themeDefList } from '../world/themes';
 
 const audio = createAudio(DEFAULT_SETTINGS);
 
@@ -94,9 +95,16 @@ unlockBtn.addEventListener('click', () => {
 
 // music controls
 const musicSec = section('Music modes (0.6s crossfade; same mode = no-op)');
-(['menu', 'gameplay', 'victory', 'off'] as MusicMode[]).forEach((mode) => {
+(['menu', 'victory', 'off'] as MusicMode[]).forEach((mode) => {
   const b = el('button', musicSec, mode);
   b.addEventListener('click', () => audio.setMusic(mode));
+});
+
+// gameplay music is per-court: own theme(s) once, then the shuffle
+const courtSec = section('Gameplay music by court (own theme[s] first, then shuffle)');
+themeDefList().forEach((t) => {
+  const b = el('button', courtSec, t.name);
+  b.addEventListener('click', () => audio.setMusic('gameplay', t.id));
 });
 
 // volumes

@@ -8,14 +8,16 @@
  *
  * Modes:
  *   menu     -> "Cursed Court Rally 1" looping
- *   gameplay -> "Cursed Court Rally 2" once, then an endless
- *               reshuffled bag of [Mushroom Dash, Interlude,
- *               Rally 1] (no immediate repeats)
+ *   gameplay -> the chosen court's own theme(s), each once and in
+ *               order, then an endless reshuffled bag of the house
+ *               tracks PLUS that court's themes (no immediate
+ *               repeats). Courts with no theme of their own open on
+ *               "Cursed Court Rally 2" instead.
  *   victory  -> "Cursed Court Short" once
  *   off      -> fade everything out
  * ============================================================ */
 
-import type { MusicMode } from '../core/types';
+import type { CourtTheme, MusicMode } from '../core/types';
 
 const CROSSFADE_S = 0.6;
 const TICK_MS = 30;
@@ -23,7 +25,34 @@ const TICK_MS = 30;
 const FILE_MENU = 'Cursed Court Rally 1.mp3';
 const FILE_GAMEPLAY_INTRO = 'Cursed Court Rally 2.mp3';
 const FILE_VICTORY = 'Cursed Court Short.mp3';
-const SHUFFLE_FILES = ['Mushroom Dash.mp3', 'Cursed Court Interlude.mp3', 'Cursed Court Rally 1.mp3'];
+
+/** always in the gameplay shuffle, whatever court is being played */
+const HOUSE_TRACKS = [
+  'Cursed Court Rally 2.mp3',
+  'Mushroom Dash.mp3',
+  'Cursed Court Interlude.mp3',
+  'Cursed Court Rally 1.mp3',
+];
+
+/**
+ * Per-court soundtrack. These play first (in order, once each) when a match
+ * starts, and stay in the shuffle afterwards.
+ *
+ * Adding a track is a one-line change: drop the mp3 in `public/music/` and
+ * list its filename here. A file that fails to load is skipped immediately
+ * rather than stalling the playlist, so a name listed ahead of its upload
+ * degrades to the shuffle instead of silence.
+ */
+const COURT_TRACKS: Record<CourtTheme, string[]> = {
+  shibuya: ['Shibuya Hard Court 1.mp3', 'Shibuya Hard Court 2.mp3'],
+  night: ['Moonlit Match Point 1.mp3', 'Moonlit Match Point 2.mp3'],
+  jujutsuhigh: ['Jujutsu High Lawn 1.mp3', 'Jujutsu High Lawn 2.mp3'],
+  nevarro: ['Nevarro Clay 1.mp3', 'Nevarro Clay 2.mp3'],
+  dune: ['Dune Sea Rally 1.mp3'],
+  mandalore: ['Mandalore Dome 1.mp3'],
+  foundry: [], // no Mayhem Foundry track yet — opens on the house intro
+  circuit: ['Neon Circuit 1.mp3'],
+};
 
 /** base-relative URL (works under vite base './'), spaces escaped */
 function trackUrl(file: string): string {
@@ -49,6 +78,8 @@ export class MusicManager {
   private pendingMode: MusicMode | null = null;
   private unlocked = false;
   private volume: number;
+  /** court whose soundtrack gameplay mode should use */
+  private court: CourtTheme | null = null;
 
   private current: Playing | null = null;
   private fadingOut: Playing[] = [];
@@ -58,8 +89,11 @@ export class MusicManager {
   /** bumped on every mode change so stale 'ended' handlers no-op */
   private gen = 0;
 
-  private bag: string[] = [];
-  private lastShuffled: string | null = null;
+  /** tracks still to play before the next reshuffle */
+  private queue: string[] = [];
+  /** what the shuffle draws from once the court's opening set is done */
+  private shufflePool: string[] = [];
+  private lastPlayed: string | null = null;
 
   constructor(initialVolume: number) {
     this.volume = clamp01(initialVolume);
@@ -76,8 +110,11 @@ export class MusicManager {
     }
   }
 
-  setMode(mode: MusicMode): void {
-    if (mode === this.mode) return; // same mode: never restart
+  setMode(mode: MusicMode, court?: CourtTheme): void {
+    // a new court restarts gameplay music even though the mode is unchanged
+    const courtChanged = court !== undefined && court !== this.court;
+    if (court !== undefined) this.court = court;
+    if (mode === this.mode && !(mode === 'gameplay' && courtChanged)) return;
     this.mode = mode;
     if (!this.unlocked) {
       this.pendingMode = mode;
@@ -114,12 +151,15 @@ export class MusicManager {
         break;
       case 'gameplay': {
         const gen = this.gen;
-        this.bag = [];
-        this.lastShuffled = null;
-        this.playFile(FILE_GAMEPLAY_INTRO, {
-          loop: false,
-          onEnded: () => this.playNextShuffled(gen),
-        });
+        const own = (this.court && COURT_TRACKS[this.court]) || [];
+        // the court's own theme(s) open the match, each played once
+        this.queue = own.length ? [...own] : [FILE_GAMEPLAY_INTRO];
+        // ...and stay in the mix once the shuffle takes over
+        this.shufflePool = [...new Set([...HOUSE_TRACKS, ...own])];
+        this.lastPlayed = null;
+        const first = this.queue.shift()!;
+        this.lastPlayed = first;
+        this.playFile(first, { loop: false, onEnded: () => this.advance(gen) });
         break;
       }
       case 'off':
@@ -152,10 +192,17 @@ export class MusicManager {
       gen,
     };
     if (opts.onEnded) {
-      el.addEventListener('ended', () => {
-        if (gen !== this.gen) return; // mode changed since; ignore
+      // 'ended' and 'error' both hand off to the next track, but only the
+      // first one to fire may — a track that 404s must not also advance
+      // when the element later reports itself finished.
+      let handedOff = false;
+      const handOff = (): void => {
+        if (handedOff || gen !== this.gen) return; // stale or already moved on
+        handedOff = true;
         opts.onEnded!();
-      });
+      };
+      el.addEventListener('ended', handOff);
+      el.addEventListener('error', handOff);
     }
     this.current = playing;
     const p = el.play();
@@ -163,32 +210,36 @@ export class MusicManager {
     this.ensureTimer();
   }
 
-  /** endless shuffle mix after the gameplay intro track */
-  private playNextShuffled(gen: number): void {
+  /** move to the next queued track, reshuffling the pool when it runs dry */
+  private advance(gen: number): void {
     if (gen !== this.gen || this.mode !== 'gameplay') return;
-    if (this.bag.length === 0) {
-      this.bag = [...SHUFFLE_FILES];
-      // Fisher-Yates
-      for (let i = this.bag.length - 1; i > 0; i--) {
-        const j = (Math.random() * (i + 1)) | 0;
-        [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
-      }
-      // avoid playing the same track twice in a row across bag refills
-      if (this.bag.length > 1 && this.bag[0] === this.lastShuffled) {
-        const k = 1 + ((Math.random() * (this.bag.length - 1)) | 0);
-        [this.bag[0], this.bag[k]] = [this.bag[k], this.bag[0]];
-      }
-    }
-    const file = this.bag.shift()!;
-    this.lastShuffled = file;
+    if (this.queue.length === 0) this.refillShuffled();
+    const file = this.queue.shift();
+    if (!file) return; // nothing playable at all
+    this.lastPlayed = file;
     // previous track ended naturally, so no crossfade needed — just a
     // short fade-in to stay click-free
     this.retireCurrent();
     this.playFile(file, {
       loop: false,
       fadeIn: 0.15,
-      onEnded: () => this.playNextShuffled(gen),
+      onEnded: () => this.advance(gen),
     });
+  }
+
+  private refillShuffled(): void {
+    const bag = [...this.shufflePool];
+    // Fisher-Yates
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
+    // avoid playing the same track twice in a row across bag refills
+    if (bag.length > 1 && bag[0] === this.lastPlayed) {
+      const k = 1 + ((Math.random() * (bag.length - 1)) | 0);
+      [bag[0], bag[k]] = [bag[k], bag[0]];
+    }
+    this.queue = bag;
   }
 
   // ---------- fade engine ----------

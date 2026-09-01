@@ -215,7 +215,9 @@ export interface SfxOpts {
 export interface AudioApi {
   /** must be called from a user-gesture handler before anything plays */
   unlock(): void;
-  setMusic(mode: MusicMode): void;
+  /** `court` selects the gameplay soundtrack: that court's own theme(s)
+   *  play first, then an endless shuffle that keeps them in the mix */
+  setMusic(mode: MusicMode, court?: CourtTheme): void;
   sfx(name: SfxName, opts?: SfxOpts): void;
   /** start/stop the looping charge shimmer */
   chargeLoop(on: boolean): void;

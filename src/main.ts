@@ -361,7 +361,7 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
     resize(); // pane aspect differs from the full-screen one
 
     state = 'match';
-    audio.setMusic('gameplay');
+    audio.setMusic('gameplay', theme.id);
     ui.hideLoading();
     ui.showMatchHud([match.teamInfo(0), match.teamInfo(1)]);
   } catch (err) {
