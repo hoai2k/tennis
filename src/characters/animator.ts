@@ -65,16 +65,17 @@ const FLAVORS: Record<string, Flavor> = {
     victory: 'stomp',
   },
   konga: {
-    // hunched gorilla carriage: rounded spine, head up, arms wide and low
+    // hunched gorilla carriage: rounded spine, head up under the shoulders,
+    // long left arm hanging apelike. The racquet arm is deliberately left
+    // alone — konga's arms already reach the floor, so any extra droop on
+    // that side buries the racquet in the court.
     stance: {
-      spine1: [14, 0, 0], spine2: [9, 0, 0], head: [-16, 0, 0],
-      shoulderL: [0, 0, 6], shoulderR: [0, 0, -6],
-      upperArmL: [4, 0, 14], upperArmR: [4, 0, -14],
-      forearmL: [10, 0, 0], forearmR: [10, 0, 0],
-      thighL: [-6, 0, 5], thighR: [-6, 0, -5],
-      shinL: [10, 0, 0], shinR: [10, 0, 0],
+      spine1: [7, 0, 0], spine2: [4, 0, 0], head: [-10, 0, 0],
+      shoulderL: [0, 0, 7], upperArmL: [2, 0, 16], forearmL: [18, 0, 0],
+      thighL: [-3, 0, 6], thighR: [-3, 0, -6],
+      shinL: [6, 0, 0], shinR: [6, 0, 0],
     },
-    stanceHip: [0, -0.07, 0],
+    stanceHip: [0, -0.025, 0],
     stride: 0.9,
     victory: 'chestbeat',
   },
@@ -91,15 +92,15 @@ const FLAVORS: Record<string, Flavor> = {
     },
     stride: 0.85,
   },
-  // aspirational: these three stay on clip rigs until their *_rig exports
-  // are fixed, but the flavor is ready for the day they switch over
   saurion: {
+    // raptor: forward lean over bent legs, left forearm tucked up.
+    // Racquet arm untouched, as with konga.
     stance: {
-      spine1: [16, 0, 0], spine2: [8, 0, 0], head: [-18, 0, 0],
-      thighL: [-10, 0, 4], thighR: [-10, 0, -4], shinL: [16, 0, 0], shinR: [16, 0, 0],
-      upperArmL: [8, 0, -6], upperArmR: [8, 0, 6], forearmL: [24, 0, 0], forearmR: [24, 0, 0],
+      spine1: [9, 0, 0], spine2: [5, 0, 0], head: [-12, 0, 0],
+      thighL: [-6, 0, 4], thighR: [-6, 0, -4], shinL: [10, 0, 0], shinR: [10, 0, 0],
+      upperArmL: [6, 0, -12], forearmL: [32, 0, 0],
     },
-    stanceHip: [0, -0.09, 0],
+    stanceHip: [0, -0.035, 0],
     stride: 1.15,
   },
   nullbot: {

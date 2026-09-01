@@ -106,6 +106,9 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Verified: humanoid singles to victory (konga_rig/titanus_rig,
       network-confirmed), clip doubles regression, settings toggle UI,
       originals byte-identical racquet positions
-- [ ] saurion/nullbot/frogger *_rig exports have the skeleton displaced from
-      the mesh (bind-space mismatch) — kept on clip rigs; re-export with
-      armature transform applied to enable them
+- [x] saurion/nullbot/frogger *_rig exports fixed at the source and enabled —
+      all 7 mechs now run humanoid rigs (33/33 bones inside the bind-pose
+      mesh, matching the models that already worked)
+- [x] Fixed a self-inflicted regression found while enabling them: konga's and
+      saurion's crouch flavors hung the racquet below the court at rest
+      (-0.20m); stances now keep the crouch but leave the racquet arm free

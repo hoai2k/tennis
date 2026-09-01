@@ -92,21 +92,13 @@ export const ROSTER: CharacterDef[] = [
 
 export const ROSTER_BY_ID = new Map(ROSTER.map((c) => [c.id, c]));
 
-/** Mech re-rigs whose skeleton actually aligns with the mesh. The
- *  saurion/nullbot/frogger *_rig exports ship the DEF skeleton displaced
- *  from the mesh in bind space (the weights point at a miniature skeleton
- *  down at the feet), so posing them smears the mesh — they stay on their
- *  clip rigs until re-exported with the armature transform applied. */
-const HUMANOID_RIG_READY = new Set<CharacterDef['id']>([
-  'titanus', 'konga', 'fenrir', 'vulcan',
-]);
-
 /** Mech Mayhem models ship in two variants: the original clip-animated rig
  *  from the source game (def.model), and a *_rig.glb humanoid re-rig with
  *  the same Rigify DEF-* skeleton as the rest of the roster, driven by the
- *  procedural tennis animator. */
+ *  procedural tennis animator. All seven re-rigs are verified aligned
+ *  (every DEF bone sits inside the skinned bind-pose mesh). */
 export function modelUrl(def: CharacterDef, humanoidRigs: boolean): string {
-  return humanoidRigs && def.series === 'mechmayhem' && HUMANOID_RIG_READY.has(def.id)
+  return humanoidRigs && def.series === 'mechmayhem'
     ? def.model.replace(/\.glb$/, '_rig.glb')
     : def.model;
 }
