@@ -3,6 +3,7 @@ import type { Avatar, CharacterDef, SwingOpts, SwingSide } from '../core/types';
 import { loadModel } from './loader';
 import { Rig } from './rig';
 import { Animator } from './animator';
+import { ClipAvatar } from './clipAvatar';
 import { buildRacquet, type Racquet } from './racquet';
 
 /* ============================================================
@@ -204,7 +205,13 @@ export async function loadAvatar(
   /** 0..1 download progress; fires only while bytes are in flight */
   onProgress?: (fraction: number) => void,
 ): Promise<Avatar> {
-  const { root, container, meshes, materials } = await loadModel(def, onProgress);
+  const loaded = await loadModel(def, onProgress);
+  // models that ship their own baked move set (the Mech Mayhem robots)
+  // use the clip-driven avatar; DEF-rigged models use the procedural one
+  if (loaded.gltf.animations.length > 0) {
+    return new ClipAvatar(def, loaded);
+  }
+  const { root, container, meshes, materials } = loaded;
   return new AvatarImpl(def, root, container, meshes, materials);
 }
 

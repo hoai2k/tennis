@@ -10,9 +10,10 @@ import type * as THREE from 'three';
 
 export type CharacterId =
   | 'yuji' | 'megumi' | 'nobara' | 'maki' | 'naoya' | 'jogo' | 'mahito'
-  | 'din' | 'ig11' | 'bossk' | 'tusken' | 'quarren' | 'duelist';
+  | 'din' | 'ig11' | 'bossk' | 'tusken' | 'quarren' | 'duelist'
+  | 'konga' | 'saurion' | 'nullbot' | 'fenrir' | 'frogger' | 'vulcan';
 
-export type Series = 'jjk' | 'mandalorian';
+export type Series = 'jjk' | 'mandalorian' | 'mechmayhem';
 
 export type PlayStyle = 'all-around' | 'power' | 'speed' | 'technique' | 'tricky' | 'defense';
 

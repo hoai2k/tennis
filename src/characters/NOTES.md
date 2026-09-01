@@ -1,7 +1,8 @@
 # src/characters — implementation notes
 
 ## Files
-- `index.ts` — public API: `loadAvatar(def)`, `preloadAvatars(defs)`; `AvatarImpl` implements the full `Avatar` contract from `core/types.ts` (glow, racquet attach, dispose).
+- `index.ts` — public API: `loadAvatar(def)`, `preloadAvatars(defs)`; `AvatarImpl` implements the full `Avatar` contract from `core/types.ts` (glow, racquet attach, dispose). `loadAvatar` branches: a GLB that ships animation clips gets a `ClipAvatar`, otherwise the procedural `AvatarImpl`.
+- `clipAvatar.ts` — Avatar implementation for the **Mech Mayhem robots** (konga, saurion, nullbot, fenrir, frogger, vulcan). Different skeleton (plain `hips/torso/shoulder/elbow/hand…` names, no DEF-* bones) but ~30 baked fighting-game clips per model (battleIdle, run, light1-3, heavy, crouch, victory, dead, per-mech specials). Tennis actions map onto clips via per-action fallback lists; swing clips are sped up so their hit frame (~38% in) lands at `SWING_CONTACT_DELAY`. Star shots use each mech's signature special (kongaSlam, saurionBite, nullBackhand, fenrirSpike, vulcanSpray, burst). The loader's bind-pose normalization is redone against the *animated* idle pose (several mechs float otherwise), and the racquet mounts on `handR` in a hammer-grip perpendicular to the forearm (along-forearm digs into the floor on hanging-arm rigs). konga note: `bigPunch1` is the LEFT fist, so forehand prefers `bigPunch2`.
 - `loader.ts` — GLTFLoader + MeshoptDecoder, height/floor/centering normalization, shadow + material prep.
 - `rig.ts` — bone mapping, hierarchy repair, canonical re-targeting (the important part, see below).
 - `poses.ts` — pose math (quat blending, easing, timelines) + the authored pose library.

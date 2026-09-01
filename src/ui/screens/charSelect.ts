@@ -260,14 +260,16 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
   }
 
   function navGrid(g: number, action: MenuAction): number {
+    const rows = Math.ceil(GRID_TOTAL / COLS);
     const row = Math.floor(g / COLS);
     const col = g % COLS;
-    const rowLen = (r: number): number => (r === 0 ? COLS : GRID_TOTAL - COLS);
+    /** length of row r (the last row may be ragged) */
+    const rowLen = (r: number): number => Math.min(COLS, GRID_TOTAL - r * COLS);
     let nr = row, nc = col;
     if (action === 'left') nc = (col + rowLen(row) - 1) % rowLen(row);
     else if (action === 'right') nc = (col + 1) % rowLen(row);
     else if (action === 'up' || action === 'down') {
-      nr = 1 - row;
+      nr = (row + (action === 'down' ? 1 : rows - 1)) % rows;
       nc = Math.min(nc, rowLen(nr) - 1);
     }
     return nr * COLS + nc;

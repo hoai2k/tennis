@@ -480,10 +480,11 @@ const params = new URLSearchParams(location.search);
       if (match) stadium.update(h, match.excitement);
     }
   },
-  async demoMatch(mode: 'singles' | 'doubles' | 'rivals' = 'singles', themeId = 'shibuya') {
+  async demoMatch(mode: 'singles' | 'doubles' | 'rivals' = 'singles', themeId = 'shibuya', charIds?: string[]) {
     const rivals = mode === 'rivals';
     chosenMode = rivals ? 'singles' : mode;
-    const ids: CharacterId[] = chosenMode === 'singles' ? ['yuji', 'din'] : ['yuji', 'megumi', 'din', 'bossk'];
+    const defaults: CharacterId[] = chosenMode === 'singles' ? ['yuji', 'din'] : ['yuji', 'megumi', 'din', 'bossk'];
+    const ids = (charIds?.length ? charIds : defaults) as CharacterId[];
     pendingSlots = ids.map((characterId, i) => ({
       characterId,
       control: (rivals ? (i as ControlSource) : 'ai') as ControlSource,
@@ -493,5 +494,9 @@ const params = new URLSearchParams(location.search);
   },
 };
 if (params.get('demo')) {
-  void (window as any).__cc.demoMatch(params.get('demo') as 'singles' | 'doubles' | 'rivals', params.get('theme') ?? 'shibuya');
+  void (window as any).__cc.demoMatch(
+    params.get('demo') as 'singles' | 'doubles' | 'rivals',
+    params.get('theme') ?? 'shibuya',
+    params.get('chars')?.split(',').filter(Boolean),
+  );
 }

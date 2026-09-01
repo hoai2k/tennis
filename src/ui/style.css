@@ -345,6 +345,8 @@
 .cc-series-jjk .cc-char-name { background: linear-gradient(90deg, #6a2a9e, #b83a5a); }
 .cc-series-mandalorian { border-color: #3a4450; }
 .cc-series-mandalorian .cc-char-name { background: linear-gradient(90deg, #4a5a6a, #c96a3b); }
+.cc-series-mechmayhem { border-color: #1f4a6a; }
+.cc-series-mechmayhem .cc-char-name { background: linear-gradient(90deg, #123048, #2a9ac9); }
 
 .cc-char-portrait { position: relative; }
 .cc-char-img-wrap, .cc-info-img-wrap {
@@ -469,6 +471,7 @@
 }
 .cc-charsel-info.cc-series-jjk { border-color: #b06aff; box-shadow: 0 6px 0 rgba(20, 10, 40, 0.35), 0 0 22px rgba(159, 79, 240, 0.55); }
 .cc-charsel-info.cc-series-mandalorian { border-color: #ff9d5c; box-shadow: 0 6px 0 rgba(20, 10, 40, 0.35), 0 0 22px rgba(255, 130, 60, 0.45); }
+.cc-charsel-info.cc-series-mechmayhem { border-color: #38e8ff; box-shadow: 0 6px 0 rgba(20, 10, 40, 0.35), 0 0 22px rgba(56, 232, 255, 0.5); }
 .cc-info-top { display: flex; gap: 12px; align-items: center; }
 .cc-info-portrait { flex: 0 0 clamp(64px, 11vh, 96px); }
 .cc-info-img-wrap { border-radius: 14px; }

@@ -24,3 +24,9 @@ three match their in-game themes nicely.
 ## ✅ Victory-screen burst — `public/images/victory-burst.png`
 Delivered 2026-08-31. Slowly-rotating layer behind the winner card
 (`src/ui/screens/victory.ts`); confetti + starburst read beautifully.
+
+## ✅ New court preview cards — `public/images/court-{jujutsuhigh,dune,mandalore,foundry,circuit,random}.jpg`
+Delivered 2026-09-01 (uploaded by hoai2k). All six wired into the
+court-select cards automatically via the existing `<img>` slot convention;
+the RANDOM card art sits under the animated golden "?" overlay. Verified
+loading on the court-select screen.

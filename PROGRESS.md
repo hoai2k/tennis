@@ -56,3 +56,15 @@ Status legend: [ ] todo · [~] in progress · [x] done
       9-card wrapped grid layout
 - [x] World viewer keys 1-8; smoke-tested demo match on circuit (0 errors)
 - [ ] Preview art for the 6 new cards (see image-requests.md)
+
+## Phase 7 — Mech Mayhem roster (19 characters)
+- [x] 6 Mech Mayhem characters integrated: Konga, Saurion, Nullbot, Fenrir,
+      Frogger, Vulcan (models uploaded by hoai2k)
+- [x] ClipAvatar: clip-driven Avatar for the mech rigs (their own baked
+      battleIdle/run/attack/victory clips; specials power the star shots)
+- [x] Idle-pose re-grounding (saurion/nullbot/frogger floated on bind-pose fit)
+- [x] Hammer-grip racquet mount on handR (works across all six rigs)
+- [x] Portraits rendered via charviewer portrait mode → public/portraits/
+- [x] Char select: 3-row grid nav (20 tiles), Mech Mayhem series styling
+- [x] Verified: full singles match to victory (konga/vulcan, foundry) and
+      doubles (saurion/nullbot/fenrir/frogger, circuit) — 0 console errors
