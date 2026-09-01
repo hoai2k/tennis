@@ -12,6 +12,8 @@ const MAX_PULLBACK = 13;
 
 export class MatchCamera {
   readonly camera: THREE.PerspectiveCamera;
+  /** which baseline this camera sits behind; team 1 views the court mirrored */
+  private sign: 1 | -1;
   private lookTarget = new THREE.Vector3(0, 1, 0);
   private posTarget = new THREE.Vector3();
   private shakeOffset = new THREE.Vector3();
@@ -20,14 +22,23 @@ export class MatchCamera {
   private _look = new THREE.Vector3();
   private _back = new THREE.Vector3();
 
-  constructor(aspect: number) {
+  constructor(aspect: number, team: 0 | 1 = 0) {
+    this.sign = team === 0 ? 1 : -1;
     this.camera = new THREE.PerspectiveCamera(48, aspect, 0.1, 400);
-    this.camera.position.set(0, 9.5, COURT.halfLength + 9);
-    this.camera.lookAt(0, 0.5, -4);
+    this.camera.position.set(0, 9.5, this.sign * (COURT.halfLength + 9));
+    this.camera.lookAt(0, 0.5, this.sign * -4);
   }
 
   resize(aspect: number): void {
     this.camera.aspect = aspect;
+    this.camera.updateProjectionMatrix();
+  }
+
+  /** A split pane is short and wide: widening the aspect alone only adds
+   *  horizontal view, so open the vertical field too or the framing logic
+   *  retreats halfway out of the stadium to fit the court in. */
+  setSplit(on: boolean): void {
+    this.camera.fov = on ? 62 : 48;
     this.camera.updateProjectionMatrix();
   }
 
@@ -48,15 +59,16 @@ export class MatchCamera {
     const bx = THREE.MathUtils.clamp(ballPos.x, -6, 6);
     const bz = THREE.MathUtils.clamp(ballPos.z, -COURT.halfLength, COURT.halfLength);
 
+    const sg = this.sign;
     this.lookTarget.lerp(
-      this._look.set(bx * 0.5, 0.8, bz * 0.28 - 2.5),
+      this._look.set(bx * 0.5 * sg, 0.8, sg * (bz * sg * 0.28 - 2.5)),
       1 - Math.exp(-dt * 4),
     );
 
     this.posTarget.set(
-      bx * 0.35,
+      bx * 0.35 * sg,
       9.2 + Math.max(0, ballPos.y - 4) * 0.25,
-      COURT.halfLength + 8.6 + bz * 0.1,
+      sg * (COURT.halfLength + 8.6 + bz * sg * 0.1),
     );
 
     // --- keep everyone in shot ---

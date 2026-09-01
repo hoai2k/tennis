@@ -23,11 +23,19 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.NoToneMapping; // world palette is tuned for raw sRGB
 
 const scene = new THREE.Scene();
-const matchCam = new MatchCamera(window.innerWidth / window.innerHeight);
+const matchCam = new MatchCamera(window.innerWidth / window.innerHeight, 0);
+/** second view, used only when humans face each other across the net */
+const rivalCam = new MatchCamera(window.innerWidth / window.innerHeight, 1);
+let splitView = false;
 
 function resize(): void {
   renderer.setSize(window.innerWidth, window.innerHeight);
-  matchCam.resize(window.innerWidth / window.innerHeight);
+  const full = window.innerWidth / window.innerHeight;
+  // each split pane is full width by half height
+  matchCam.setSplit(splitView);
+  matchCam.resize(splitView ? full * 2 : full);
+  rivalCam.setSplit(true);
+  rivalCam.resize(full * 2);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -348,6 +356,10 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
     };
 
     (window as unknown as { __loadMs?: number }).__loadMs = Math.round(performance.now() - loadStart);
+    splitView = match.needsSplitView;
+    ui.setSplitView(splitView, match.slotTeams());
+    resize(); // pane aspect differs from the full-screen one
+
     state = 'match';
     audio.setMusic('gameplay');
     ui.hideLoading();
@@ -365,6 +377,9 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
 }
 
 function endMatch(): void {
+  splitView = false;
+  ui.setSplitView(false, []);
+  resize();
   if (match) {
     scene.remove(match.group);
     match.dispose();
@@ -382,6 +397,28 @@ function backgroundWorkPending(): boolean {
   return st.inFlight > 0 || st.queued > 0;
 }
 
+/** one pane per side when rivals share a screen, otherwise a single view */
+function renderFrame(): void {
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  if (!splitView) {
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, W, H);
+    renderer.render(scene, matchCam.camera);
+    return;
+  }
+  const half = Math.floor(H / 2);
+  renderer.setScissorTest(true);
+  // team 0 on top, team 1 below (three's viewport origin is bottom-left)
+  renderer.setViewport(0, half, W, H - half);
+  renderer.setScissor(0, half, W, H - half);
+  renderer.render(scene, matchCam.camera);
+  renderer.setViewport(0, 0, W, half);
+  renderer.setScissor(0, 0, W, half);
+  renderer.render(scene, rivalCam.camera);
+  renderer.setScissorTest(false);
+}
+
 let menuFrameToggle = false;
 let last = performance.now();
 function frame(now: number): void {
@@ -392,7 +429,11 @@ function frame(now: number): void {
   if (state === 'match' || state === 'victory') {
     match?.update(dt);
     stadium.update(dt, match ? match.excitement : 0.6);
-    if (match) matchCam.update(dt, match.ball.pos, match.fx.shake, match.focusPoints());
+    if (match) {
+      const focus = match.focusPoints();
+      matchCam.update(dt, match.ball.pos, match.fx.shake, focus);
+      if (splitView) rivalCam.update(dt, match.ball.pos, match.fx.shake, focus);
+    }
   } else {
     idleT += dt;
     stadium.update(dt, 0.25);
@@ -408,7 +449,7 @@ function frame(now: number): void {
     menuFrameToggle = !menuFrameToggle;
     skip = menuFrameToggle;
   }
-  if (!skip) renderer.render(scene, matchCam.camera);
+  if (!skip) renderFrame();
   requestAnimationFrame(frame);
 }
 
@@ -425,6 +466,7 @@ const params = new URLSearchParams(location.search);
   get state() { return state; },
   get match() { return match; },
   ui, input, audio,
+  pendingSlots: () => pendingSlots.map((x) => x.characterId),
   poolSize: () => [...avatarPool.values()].reduce((n, l) => n + l.length, 0),
   warmStats: () => warmer.stats(),
   get camera() { return matchCam.camera; },
@@ -438,14 +480,18 @@ const params = new URLSearchParams(location.search);
       if (match) stadium.update(h, match.excitement);
     }
   },
-  async demoMatch(mode: 'singles' | 'doubles' = 'singles', themeId = 'shibuya') {
-    chosenMode = mode;
-    const ids: CharacterId[] = mode === 'singles' ? ['yuji', 'din'] : ['yuji', 'megumi', 'din', 'bossk'];
-    pendingSlots = ids.map((characterId) => ({ characterId, control: 'ai' as const }));
+  async demoMatch(mode: 'singles' | 'doubles' | 'rivals' = 'singles', themeId = 'shibuya') {
+    const rivals = mode === 'rivals';
+    chosenMode = rivals ? 'singles' : mode;
+    const ids: CharacterId[] = chosenMode === 'singles' ? ['yuji', 'din'] : ['yuji', 'megumi', 'din', 'bossk'];
+    pendingSlots = ids.map((characterId, i) => ({
+      characterId,
+      control: (rivals ? (i as ControlSource) : 'ai') as ControlSource,
+    }));
     const theme = themeDefs().find((t) => t.id === themeId) ?? themeDefs()[0];
     await startMatch(theme, 1, false);
   },
 };
 if (params.get('demo')) {
-  void (window as any).__cc.demoMatch(params.get('demo') === 'doubles' ? 'doubles' : 'singles', params.get('theme') ?? 'shibuya');
+  void (window as any).__cc.demoMatch(params.get('demo') as 'singles' | 'doubles' | 'rivals', params.get('theme') ?? 'shibuya');
 }

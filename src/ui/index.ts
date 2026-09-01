@@ -61,6 +61,8 @@ export interface UiApi {
   setCharge(slot: number, v: number): void;
   /** sprint stamina 0..1 for a player, -1 hides */
   setStamina(slot: number, v: number): void;
+  /** two-pane mode: move each player's meters into their own half */
+  setSplitView(enabled: boolean, slotTeams: (0 | 1)[]): void;
   /** full-screen loading overlay with a progress bar (0..1) */
   showLoading(): void;
   setLoadingProgress(fraction: number, label?: string): void;
@@ -352,6 +354,11 @@ export function createUI(root: HTMLElement, cb: UiCallbacks, initial: GameSettin
 
     setStamina(slot: number, v: number) {
       hud.setStamina(slot, v);
+    },
+
+    setSplitView(enabled: boolean, slotTeams: (0 | 1)[]) {
+      uiRoot.classList.toggle('cc-split', enabled);
+      hud.setSplitView(enabled, slotTeams);
     },
 
     setCharge(slot: number, v: number) {

@@ -145,6 +145,15 @@ export class Hud {
     this.announceLayer.innerHTML = '';
   }
 
+  /** in split view each player's meters live inside their own pane */
+  setSplitView(enabled: boolean, slotTeams: (0 | 1)[]): void {
+    this.el.classList.toggle('cc-hud-split', enabled);
+    this.chargeEls.forEach((c, i) => {
+      c.wrap.classList.toggle('cc-meter-top', enabled && slotTeams[i] === 0);
+      c.wrap.classList.toggle('cc-meter-bottom', enabled && slotTeams[i] === 1);
+    });
+  }
+
   /** sprint stamina 0..1 (-1 hides the whole meter cluster) */
   setStamina(slot: number, v: number): void {
     const c = this.chargeEls[slot];

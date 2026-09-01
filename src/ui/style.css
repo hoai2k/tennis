@@ -1458,3 +1458,53 @@
 }
 .cc-stamina-fill.cc-stamina-low { background: linear-gradient(90deg, #ffc23d 0%, #ffe27a 100%); }
 .cc-stamina-fill.cc-stamina-out { background: #ff5a5a; }
+
+/* RANDOM character tile */
+.cc-char-card.cc-char-random {
+  background: linear-gradient(160deg, #4b2f8f 0%, #2a1856 100%);
+  border-color: #b98cff;
+}
+.cc-char-random-mark {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 46px;
+  font-weight: 900;
+  color: #ffd42a;
+  -webkit-text-stroke: 3px var(--cc-ink);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 rgba(20, 10, 40, 0.5);
+  animation: cc-random-pulse 1.6s ease-in-out infinite;
+}
+@keyframes cc-random-pulse {
+  0%, 100% { transform: scale(1) rotate(-4deg); }
+  50% { transform: scale(1.12) rotate(4deg); }
+}
+.cc-info-random-mark { font-size: 64px; }
+.cc-charsel-info.cc-info-random { border-color: #b98cff; }
+
+/* ---------------------------------------------------------------- */
+/* SPLIT VIEW — one pane per side when rivals share a screen          */
+/* ---------------------------------------------------------------- */
+
+/* hairline between the two panes */
+.cc-ui.cc-split::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-2px);
+  background: linear-gradient(90deg, rgba(255,212,42,0.15), var(--cc-yellow), rgba(255,212,42,0.15));
+  box-shadow: 0 0 12px rgba(255, 212, 42, 0.5);
+  pointer-events: none;
+  z-index: 40;
+}
+/* meters sit inside their own pane rather than at the screen edges */
+.cc-hud-split .cc-charge.cc-meter-top { bottom: auto; top: calc(50% - 118px); }
+.cc-hud-split .cc-charge.cc-meter-bottom { bottom: 84px; }
+/* announcements read on both halves, so keep them off the divider */
+.cc-hud-split .cc-announce-layer { align-items: flex-start; padding-top: 12vh; }

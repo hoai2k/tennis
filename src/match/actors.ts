@@ -17,7 +17,7 @@ export interface ActorIntent {
 
 const COMBO_WINDOW = 0.24;
 /** sprint tuning: a sustained boost you steer, not a fixed-length dash */
-const SPRINT_SPEED_MUL = 1.5;
+const SPRINT_SPEED_MUL = 1.78;
 /** full bar lasts this long at a flat sprint (seconds) */
 const SPRINT_DRAIN = 1 / 2.6;
 /** and refills in about this long once released */

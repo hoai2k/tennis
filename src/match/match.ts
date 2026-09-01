@@ -34,6 +34,12 @@ const CONTACT_OFFSET: Record<string, { x: number; z: number }> = {
   overhead: { x: 0.32, z: 0.60 },
 };
 
+/** how far ahead the chance-star looks for a playable point, and how finely */
+const STAR_HORIZON = 2.2;
+const STAR_SAMPLES = 30;
+/** how close you must be to the star to trigger a star shot (metres) */
+const STAR_HIT_RADIUS = 1.6;
+
 /** look-ahead used to decide when to swing (seconds) */
 const REACH_HORIZON = 0.5;
 /** samples across that look-ahead */
@@ -73,6 +79,7 @@ export class MatchController {
   private starConsumedBy: Actor | null = null;
   private _contactTmp = new THREE.Vector3();
   private _focus: THREE.Vector3[] = [];
+  private _starPath: THREE.Vector3[] = Array.from({ length: 30 }, () => new THREE.Vector3());
   private _samples: THREE.Vector3[] = Array.from({ length: 12 }, () => new THREE.Vector3());
   /** tuning counters (read by the dev harness) */
   readonly stats = { swings: 0, lunges: 0, leaps: 0, rallies: [] as number[], endings: [] as string[], faults: 0 };
@@ -416,7 +423,13 @@ export class MatchController {
     // star shot?
     let kind = actor.chargeKind;
     let star = false;
-    if (this.fx.starActive && actor.pos.distanceTo(this.fx.starPos) < 1.15) {
+    const starDist = this.fx.starActive
+      ? Math.min(
+        Math.hypot(actor.pos.x - this.fx.starPos.x, actor.pos.z - this.fx.starPos.z),
+        Math.hypot(contact.x - this.fx.starPos.x, contact.z - this.fx.starPos.z),
+      )
+      : Infinity;
+    if (starDist < STAR_HIT_RADIUS) {
       kind = 'star';
       star = true;
       this.fx.hideStar();
@@ -512,15 +525,28 @@ export class MatchController {
     if (this.fx.starActive) return;
     const floaty = kind === 'lob' || kind === 'drop';
     const slow = time > 1.3;
-    if (!floaty && !(slow && Math.random() < 0.45)) return;
+    const force = (window as unknown as { __ccAlwaysStar?: boolean }).__ccAlwaysStar === true;
+    if (!force && !floaty && !(slow && Math.random() < 0.45)) return;
     if (!this.inCourt(target)) return;
-    // star sits one step behind the landing spot (further from the net)
-    const star = new THREE.Vector3(target.x, 0, target.z - 0.9 * hitter.dir);
-    const receiverSide = -hitter.dir; // -1 ⇒ z<0 side
-    star.z = receiverSide === -1
-      ? THREE.MathUtils.clamp(star.z, -COURT.halfLength + 0.5, -0.8)
-      : THREE.MathUtils.clamp(star.z, 0.8, COURT.halfLength - 0.5);
-    this.fx.showStar(star);
+
+    // Mark where the ball can ACTUALLY be struck, not where the shot was
+    // aimed. Spin, drag and the bounce all move the ball off its target, so
+    // a star placed from the target sat somewhere the ball never arrived —
+    // you would stand on it and the ball would bounce past you.
+    const receiverSide = -hitter.dir;
+    this.ball.sampleForward(STAR_HORIZON, STAR_SAMPLES, this._starPath);
+    let found = -1;
+    for (let i = 0; i < STAR_SAMPLES; i++) {
+      const sp = this._starPath[i];
+      if (Math.sign(sp.z) !== Math.sign(receiverSide)) continue;
+      if (sp.y < 0.45 || sp.y > 1.8) continue;      // comfortable strike height
+      if (!this.inCourt(sp)) continue;
+      found = i;
+      break;                                        // earliest playable point
+    }
+    if (found < 0) return;
+    const sp = this._starPath[found];
+    this.fx.showStar(new THREE.Vector3(sp.x, 0, sp.z));
     this.deps.audio.sfx('star_appear');
   }
 
@@ -793,6 +819,20 @@ export class MatchController {
   /** tiny mercy: if ball is about to pass a non-charging human within easy
    *  reach, do nothing (they must press). AI always charges via brain. */
   private tryAutoSwing(_a: Actor): void {}
+
+  /** true when humans are on BOTH teams — each needs their own view */
+  get needsSplitView(): boolean {
+    const t0 = this.teamActors(0).some((a) => a.isHuman);
+    const t1 = this.teamActors(1).some((a) => a.isHuman);
+    return t0 && t1;
+  }
+
+  /** which team each slot plays for (drives per-half HUD placement) */
+  slotTeams(): (0 | 1)[] {
+    const out: (0 | 1)[] = [];
+    for (const a of this.actors) out[a.slot] = a.team;
+    return out;
+  }
 
   /** everything the camera must keep on screen: the ball and every player */
   focusPoints(): THREE.Vector3[] {

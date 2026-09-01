@@ -9,11 +9,24 @@ import { CPU_COLOR, PAD_COLORS, STYLE_BADGE, div, el, initials, pop } from '../d
 /* ------------------------------------------------------------------ */
 
 const COLS = 7;
+/** grid index of the RANDOM tile (sits after the roster) */
+const RANDOM_IDX = ROSTER.length;
+const GRID_TOTAL = ROSTER.length + 1;
+
+/** random pick, preferring characters nobody has taken yet — three CPUs all
+ *  rolling the same fighter reads as a bug even when it is honest chance */
+function randomCharacterId(taken: ReadonlySet<CharacterId>): CharacterId {
+  const fresh = ROSTER.filter((c) => !taken.has(c.id));
+  const pool = fresh.length ? fresh : ROSTER;
+  return pool[Math.floor(Math.random() * pool.length)].id;
+}
 
 interface HumanCursor {
   pad: number;
   grid: number;
   locked: boolean;
+  /** resolved at lock time — the RANDOM tile rolls a concrete character */
+  pick?: CharacterId;
   el: HTMLElement; // cursor frame element (re-parented between cards)
 }
 
@@ -55,6 +68,22 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
     grid.appendChild(card);
     cards.push(card);
   });
+
+  // ------- RANDOM tile: the default pick, so confirming straight away
+  // gives you (or the CPU) a surprise character -------
+  {
+    const card = div('cc-char-card cc-char-random');
+    card.dataset.grid = String(RANDOM_IDX);
+    const port = div('cc-char-portrait');
+    port.appendChild(div('cc-char-random-mark', '?'));
+    card.appendChild(port);
+    card.appendChild(div('cc-char-name', 'Random'));
+    card.appendChild(div('cc-char-badge', '\u2753'));
+    card.addEventListener('click', () => onCardClick(RANDOM_IDX));
+    card.addEventListener('mouseenter', () => showInfoFor(RANDOM_IDX));
+    grid.appendChild(card);
+    cards.push(card);
+  }
 
   // ------- side panel: info + slots -------
   const info = div('cc-charsel-info');
@@ -106,7 +135,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
   let humans: HumanCursor[] = []; // kept sorted by pad index
   let cpuPicks: CharacterId[] = [];
   let phase: 'humans' | 'cpu' | 'done' = 'humans';
-  let cpuGrid = 0;
+  let cpuGrid = RANDOM_IDX;
   let cpuCursorEl: HTMLElement | null = null;
   let doneTimer: number | undefined;
 
@@ -135,6 +164,21 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
     const c = (v: number): number => Math.min(255, Math.max(0, v + amt));
     const r = c((n >> 16) & 255), g = c((n >> 8) & 255), b = c(n & 255);
     return `rgb(${r},${g},${b})`;
+  }
+
+  /** info panel for any grid index, including the RANDOM tile */
+  function showInfoFor(gridIdx: number): void {
+    if (gridIdx !== RANDOM_IDX) { showInfo(ROSTER[gridIdx]); return; }
+    info.className = 'cc-charsel-info cc-info-random';
+    infoPortrait.innerHTML = '';
+    infoPortrait.appendChild(div('cc-char-random-mark cc-info-random-mark', '?'));
+    infoName.textContent = 'Random';
+    infoBadge.textContent = '\u2753 Surprise';
+    infoBadge.style.background = '#6a4bbf';
+    for (const stat of ['power', 'speed', 'spin', 'reach'] as const) {
+      statBars[stat].forEach((seg) => { seg.classList.remove('cc-on'); seg.style.background = ''; });
+    }
+    infoTagline.textContent = '“Let the court decide.”';
   }
 
   function showInfo(def: CharacterDef): void {
@@ -189,20 +233,28 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
     if (def) ctx.cb.onCharacterHover?.(def.id);
   }
 
+  /** resolve a grid index to a concrete character (random tile rolls now) */
+  function pickAt(gridIdx: number): CharacterId {
+    if (gridIdx !== RANDOM_IDX) return ROSTER[gridIdx].id;
+    const taken = new Set<CharacterId>(cpuPicks);
+    for (const h of humans) if (h.pick) taken.add(h.pick);
+    return randomCharacterId(taken);
+  }
+
   function moveCursorTo(cur: HumanCursor | 'cpu', gridIdx: number): void {
     if (cur === 'cpu') {
       const old = cpuCursorEl?.parentElement;
       cpuGrid = gridIdx;
       if (cpuCursorEl) placeCursor(cpuCursorEl, gridIdx);
       if (old) restack(old);
-      showInfo(ROSTER[gridIdx]);
+      showInfoFor(gridIdx);
       noteHover(gridIdx);
     } else {
       const old = cur.el.parentElement;
       cur.grid = gridIdx;
       placeCursor(cur.el, gridIdx);
       if (old) restack(old);
-      showInfo(ROSTER[gridIdx]);
+      showInfoFor(gridIdx);
       noteHover(gridIdx);
     }
   }
@@ -210,7 +262,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
   function navGrid(g: number, action: MenuAction): number {
     const row = Math.floor(g / COLS);
     const col = g % COLS;
-    const rowLen = (r: number): number => (r === 0 ? COLS : ROSTER.length - COLS);
+    const rowLen = (r: number): number => (r === 0 ? COLS : GRID_TOTAL - COLS);
     let nr = row, nc = col;
     if (action === 'left') nc = (col + rowLen(row) - 1) % rowLen(row);
     else if (action === 'right') nc = (col + 1) % rowLen(row);
@@ -277,14 +329,14 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       return;
     }
     phase = 'cpu';
-    cpuGrid = 0;
+    cpuGrid = RANDOM_IDX;
     if (!cpuCursorEl) {
       cpuCursorEl = makeCursorEl(`CPU ${cpuPicks.length + 1}`, CPU_COLOR, 3);
       cpuCursorEl.classList.add('cc-cursor-cpu');
     }
     updateCpuCursorLabel();
     placeCursor(cpuCursorEl, cpuGrid);
-    showInfo(ROSTER[cpuGrid]);
+    showInfoFor(cpuGrid);
     refreshSlots();
   }
 
@@ -317,7 +369,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       flourish.hidden = true;
       const slots: { characterId: CharacterId; control: ControlSource }[] = [];
       for (const h of humans) {
-        slots.push({ characterId: ROSTER[h.grid].id, control: h.pad as ControlSource });
+        slots.push({ characterId: h.pick ?? pickAt(h.grid), control: h.pad as ControlSource });
       }
       for (const id of cpuPicks) slots.push({ characterId: id, control: 'ai' });
       ctx.cb.onCharactersConfirmed(slots);
@@ -348,6 +400,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
     if (h.locked) {
       if (action === 'back') {
         h.locked = false;
+        h.pick = undefined;
         h.el.classList.remove('cc-cursor-locked');
         ctx.sfx('menu_back');
         refreshSlots();
@@ -360,11 +413,12 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       refreshSlots();
     } else if (action === 'confirm') {
       h.locked = true;
+      h.pick = pickAt(h.grid);
       h.el.classList.add('cc-cursor-locked');
       pop(cards[h.grid], 'cc-card-pop');
       ctx.sfx('menu_confirm');
       // definitely needed now — start building this avatar for real
-      ctx.cb.onCharacterLocked?.(ROSTER[h.grid].id);
+      ctx.cb.onCharacterLocked?.(h.pick);
       refreshSlots();
       afterHumanLock();
     } else if (action === 'back') {
@@ -380,10 +434,11 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       ctx.sfx('menu_move');
       refreshSlots();
     } else if (action === 'confirm') {
-      cpuPicks.push(ROSTER[cpuGrid].id);
+      const cpuPick = pickAt(cpuGrid);
+      cpuPicks.push(cpuPick);
       pop(cards[cpuGrid], 'cc-card-pop');
       ctx.sfx('menu_confirm');
-      ctx.cb.onCharacterLocked?.(ROSTER[cpuGrid].id);
+      ctx.cb.onCharacterLocked?.(cpuPick);
       if (cpuPicks.length >= cpuSlotCount()) {
         finish();
       } else {
@@ -454,9 +509,9 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       removeCpuCursor();
       phase = 'humans';
       const pads = [...activePads].sort((a, b) => a - b).slice(0, totalSlots);
-      pads.forEach((p, i) => addHuman(p, Math.min(i * 2, ROSTER.length - 1)));
+      pads.forEach((p) => addHuman(p, RANDOM_IDX));
       refreshSlots();
-      showInfo(ROSTER[humans[0]?.grid ?? 0]);
+      showInfoFor(humans[0]?.grid ?? RANDOM_IDX);
       if (humans.length === 0) {
         // no pads yet — wait for padJoined; still show info panel
         phase = 'humans';
@@ -473,7 +528,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
         cpuPicks = [];
         removeCpuCursor();
       }
-      addHuman(padIndex, 0);
+      addHuman(padIndex, RANDOM_IDX);
       ctx.sfx('menu_confirm');
       refreshSlots();
     },
@@ -501,7 +556,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       if (!h) {
         // forgiving: an unknown pad pressing a button joins mid-screen
         if (humans.length < totalSlots && padIndex >= 0 && padIndex < 4) {
-          addHuman(padIndex, 0);
+          addHuman(padIndex, RANDOM_IDX);
           refreshSlots();
           h = humans.find((x) => x.pad === padIndex);
         }
