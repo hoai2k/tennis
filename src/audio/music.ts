@@ -50,7 +50,7 @@ const COURT_TRACKS: Record<CourtTheme, string[]> = {
   nevarro: ['Nevarro Clay 1.mp3', 'Nevarro Clay 2.mp3'],
   dune: ['Dune Sea Rally 1.mp3'],
   mandalore: ['Mandalore Dome 1.mp3'],
-  foundry: [], // no Mayhem Foundry track yet — opens on the house intro
+  foundry: ['Mayhem Foundry 1.mp3'],
   circuit: ['Neon Circuit 1.mp3'],
 };
 

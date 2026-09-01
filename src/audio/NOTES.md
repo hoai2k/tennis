@@ -18,8 +18,8 @@ Owner: audio agent. Entry point: `createAudio(initial: GameSettings): AudioApi` 
 `setMusic('gameplay', courtId)` plays that court's own theme(s) first — in
 order, once each — then hands over to an endless reshuffled bag of the four
 house tracks **plus** that court's themes, so the court's music keeps coming
-back around. No track repeats back-to-back. Courts with no theme of their own
-(currently Mayhem Foundry) open on `Cursed Court Rally 2` instead.
+back around. No track repeats back-to-back. All eight courts have their own
+theme(s); a court left without one falls back to `Cursed Court Rally 2`.
 
 The court→file table is `COURT_TRACKS` in `music.ts`; adding a track is one
 line plus the mp3 in `public/music/`. A track that fails to load is skipped
