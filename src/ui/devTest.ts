@@ -9,6 +9,7 @@ import type {
   CourtThemeDef, GameSettings, MatchResult, MenuAction, ScoreState, TeamInfo,
 } from '../core/types';
 import { DEFAULT_SETTINGS } from '../core/types';
+import { themeDefList } from '../world/themes';
 import { createUI, type UiApi } from './index';
 
 const root = document.getElementById('ui-root')!;
@@ -36,11 +37,7 @@ const ui: UiApi = createUI(root, {
   onSettingsChanged: (s: GameSettings) => log('onSettingsChanged', s),
 }, DEFAULT_SETTINGS);
 
-const THEMES: CourtThemeDef[] = [
-  { id: 'shibuya', name: 'Shibuya Hard Court', ballSpeedMul: 1, bounceMul: 1 },
-  { id: 'nevarro', name: 'Nevarro Clay', ballSpeedMul: 0.9, bounceMul: 0.92 },
-  { id: 'night', name: 'Cursed Night', ballSpeedMul: 1.1, bounceMul: 1.12 },
-];
+const THEMES: CourtThemeDef[] = themeDefList();
 
 const FAKE_TEAMS: [TeamInfo, TeamInfo] = [
   { characterIds: ['yuji', 'nobara'], label: 'Yuji & Nobara', color: '#e8514a', human: true },

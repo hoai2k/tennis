@@ -108,7 +108,10 @@ export interface Avatar {
 
 // ---------- Match setup ----------
 
-export type CourtTheme = 'shibuya' | 'nevarro' | 'night';
+export type CourtTheme =
+  | 'shibuya' | 'night' | 'jujutsuhigh'          // Jujutsu Kaisen
+  | 'nevarro' | 'dune' | 'mandalore'             // The Mandalorian
+  | 'foundry' | 'circuit';                       // Mech Mayhem
 
 export interface CourtThemeDef {
   id: CourtTheme;

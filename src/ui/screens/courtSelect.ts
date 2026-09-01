@@ -21,16 +21,48 @@ const COURT_LOOKS: Record<string, CourtLook> = {
     sky: 'linear-gradient(180deg,#ffd98a,#ff9d5c)',
     blurb: 'Hard court · big city bounce',
   },
-  nevarro: {
-    surface: '#c96a3b', apron: '#8a4a2b', line: '#ffe9d0',
-    sky: 'linear-gradient(180deg,#f3c17e,#c97a4a)',
-    blurb: 'Volcanic clay · slow & gritty',
-  },
   night: {
     surface: '#3a2a5e', apron: '#241a3e', line: '#c98aff',
     sky: 'linear-gradient(180deg,#1a1030,#402a6a)',
     blurb: 'Cursed energy · fast & bouncy',
   },
+  jujutsuhigh: {
+    surface: '#2e8b3f', apron: '#b9a06a', line: '#ffffff',
+    sky: 'linear-gradient(180deg,#8ac8f0,#d8ecff)',
+    blurb: 'Sakura grass · fast & skiddy',
+  },
+  nevarro: {
+    surface: '#c96a3b', apron: '#8a4a2b', line: '#ffe9d0',
+    sky: 'linear-gradient(180deg,#f3c17e,#c97a4a)',
+    blurb: 'Volcanic clay · slow & gritty',
+  },
+  dune: {
+    surface: '#e0b36a', apron: '#c99b52', line: '#5f3a1e',
+    sky: 'linear-gradient(180deg,#7ac9e8,#ffe9b0)',
+    blurb: 'Twin suns · deep sand drag',
+  },
+  mandalore: {
+    surface: '#4a6070', apron: '#33454f', line: '#bfe8d8',
+    sky: 'linear-gradient(180deg,#2a4a4f,#9ac9b8)',
+    blurb: 'Beskar deck · blazing fast',
+  },
+  foundry: {
+    surface: '#4a5058', apron: '#33383f', line: '#ffcf2e',
+    sky: 'linear-gradient(180deg,#3a3540,#d97a3a)',
+    blurb: 'Iron plates · mega bounce',
+  },
+  circuit: {
+    surface: '#0c1626', apron: '#080d18', line: '#38e8ff',
+    sky: 'linear-gradient(180deg,#05070c,#123048)',
+    blurb: 'Overclocked · fast & wired',
+  },
+};
+
+/** pseudo-entry shown as the first card; resolves to a real theme on PLAY */
+const RANDOM_LOOK: CourtLook = {
+  surface: '#3a3352', apron: '#2a2440', line: '#ffd94f',
+  sky: 'linear-gradient(180deg,#241a3e,#4a3a7a)',
+  blurb: 'Anywhere in the multiverse',
 };
 
 const FALLBACK_LOOK: CourtLook = {
@@ -61,6 +93,9 @@ function courtPreview(look: CourtLook, themeId: string): HTMLElement {
   apron.appendChild(surf);
   apron.appendChild(net);
   p.appendChild(apron);
+  if (themeId === 'random') {
+    p.appendChild(div('cc-court-random-mark', '?'));
+  }
   return p;
 }
 
@@ -117,11 +152,15 @@ export function createCourtSelect(ctx: UiCtx): CourtSelectApi {
   function build(): void {
     cardsRow.innerHTML = '';
     courtCards = [];
-    themes.forEach((t, i) => {
-      const look = COURT_LOOKS[t.id] ?? FALLBACK_LOOK;
+    // card 0 is RANDOM (the default); real themes follow
+    const cards: (CourtThemeDef | null)[] = [null, ...themes];
+    cardsRow.classList.toggle('cc-court-cards-many', cards.length > 4);
+    cards.forEach((t, i) => {
+      const look = t ? COURT_LOOKS[t.id] ?? FALLBACK_LOOK : RANDOM_LOOK;
       const card = div('cc-court-card');
-      card.appendChild(courtPreview(look, t.id));
-      card.appendChild(div('cc-court-name', t.name));
+      if (!t) card.classList.add('cc-court-card-random');
+      card.appendChild(courtPreview(look, t ? t.id : 'random'));
+      card.appendChild(div('cc-court-name', t ? t.name : 'RANDOM'));
       card.appendChild(div('cc-court-blurb', look.blurb));
       card.addEventListener('click', () => {
         courtIdx = i; row = 0; refresh(); ctx.sfx('menu_move');
@@ -182,7 +221,10 @@ export function createCourtSelect(ctx: UiCtx): CourtSelectApi {
   function confirmPlay(): void {
     ctx.sfx('menu_confirm');
     pop(playBtn, 'cc-pressed');
-    const theme = themes[courtIdx];
+    // card 0 = RANDOM: roll a real theme at confirm time
+    const theme = courtIdx === 0
+      ? themes[Math.floor(Math.random() * themes.length)]
+      : themes[courtIdx - 1];
     if (!theme) return;
     ctx.cb.onCourtConfirmed(theme, GAMES[gamesIdx], showTeams && teamsIdx === 1);
   }
@@ -210,8 +252,9 @@ export function createCourtSelect(ctx: UiCtx): CourtSelectApi {
         refresh(); ctx.sfx('menu_move');
       } else if (action === 'left' || action === 'right') {
         const d = action === 'left' ? -1 : 1;
+        const nCards = themes.length + 1; // + the RANDOM card
         if (lr === 'courts' && themes.length) {
-          courtIdx = (courtIdx + themes.length + d) % themes.length;
+          courtIdx = (courtIdx + nCards + d) % nCards;
         } else if (lr === 'games') {
           gamesIdx = (gamesIdx + GAMES.length + d) % GAMES.length;
         } else if (lr === 'teams') {

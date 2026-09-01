@@ -4,7 +4,10 @@
 
 ```ts
 createStadium(theme: CourtTheme, crowdDensity: 'full' | 'light'): StadiumApi
-themeDefs(): CourtThemeDef[]   // shibuya / nevarro / night, with names + ballSpeedMul/bounceMul
+themeDefs(): CourtThemeDef[]   // 8 themes with names + ballSpeedMul/bounceMul:
+                               // shibuya / night / jujutsuhigh   (JJK)
+                               // nevarro / dune / mandalore      (Mandalorian)
+                               // foundry / circuit               (Mech Mayhem)
 ```
 
 Everything (court, net, stands, banners, crowd, furniture, sky, lights,
@@ -34,8 +37,13 @@ geometries/materials/textures and detaches the group.
 - Deterministic: seeded PRNG per theme, so the stadium builds identically
   every run. Build time measured at ~30–70 ms per theme.
 - Dev viewer: `worldviewer.html` (`npx vite`, open
-  `/worldviewer.html?theme=shibuya|nevarro|night&crowd=light&ex=0.8`).
-  Keys: `c` cheer, `b` big cheer + confetti, `1/2/3` switch theme.
+  `/worldviewer.html?theme=<id>&crowd=light&ex=0.8`).
+  Keys: `c` cheer, `b` big cheer + confetti, `1`-`8` switch theme.
+- Theme extras: palettes may carry `bannerTexts` (per-theme wall banners),
+  a second sun (`sun2Pos/Size/Color`, used by `dune`), and skyline variants
+  `shrine` (hills + sakura + torii/pagoda), `dunes` (dunes + sandcrawler +
+  vaporators), `domes` (shattered beskar domes + mist), `foundry`
+  (factories + glowing chimneys + molten band).
 
 ## Contract deviations
 
