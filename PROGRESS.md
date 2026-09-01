@@ -91,3 +91,20 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Char select is now exactly 3 rows of 7 (20 roster + Random)
 - [x] Verified: singles to victory (titanus/konga, foundry), doubles mixing
       mechs with the older roster (circuit), all 7 mechs regression-checked
+
+## Phase 10 — Humanoid mech rigs + swing tuning
+- [x] Per-model clip retuning: nullbot/frogger forehands now use the light3
+      arc (racquet at 1.4m, was ankle height), saurion backhand uses the
+      quill-fan flare, frogger smash/serve uses the groundPound leap apex,
+      nullbot smash timed to the heavy wind-through peak — every stroke on
+      every mech contacts at proper height
+- [x] "MECH RIGS: ORIGINAL / HUMANOID" setting (persisted); HUMANOID loads
+      *_rig.glb re-rigs driven by the procedural tennis animator
+- [x] Personality flavors for the humanoid path (konga knuckle stance +
+      chest-beat, titanus stomps, fenrir lope, vulcan gun-platform bearing)
+- [x] Verified: humanoid singles to victory (konga_rig/titanus_rig,
+      network-confirmed), clip doubles regression, settings toggle UI,
+      originals byte-identical racquet positions
+- [ ] saurion/nullbot/frogger *_rig exports have the skeleton displaced from
+      the mesh (bind-space mismatch) — kept on clip rigs; re-export with
+      armature transform applied to enable them

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { DEFAULT_SETTINGS, type Avatar, type CharacterId, type ControlSource, type CourtThemeDef, type MatchResult, type MatchSetup, type PlayerSlot } from './core/types';
-import { ROSTER, characterById } from './core/roster';
+import { ROSTER, characterById, modelUrl } from './core/roster';
 import { AssetWarmer } from './core/warm';
 import { InputManager } from './core/input';
 import { createAudio } from './audio';
@@ -98,11 +98,11 @@ const ui: UiApi = createUI(uiRoot, {
   },
   onCharacterHover(id) {
     // dwelling on a card promotes that model up the warm queue
-    warmer.warm(characterById(id).model, 'likely');
+    warmer.warm(modelUrl(characterById(id), useHumanoidRigs()), 'likely');
   },
   onCharacterLocked(id) {
     // wanted for certain: finish the download and build the avatar now
-    warmer.warm(characterById(id).model, 'certain');
+    warmer.warm(modelUrl(characterById(id), useHumanoidRigs()), 'certain');
     const inMatchAlready = avatarPool.get(id)?.length ?? 0;
     preloadAvatarFor(id, inMatchAlready + 1);
   },
@@ -110,8 +110,19 @@ const ui: UiApi = createUI(uiRoot, {
     audio.setMusicVolume(s.musicVolume);
     audio.setSfxVolume(s.sfxVolume);
     audio.setMuted(s.muted);
+    // rig-variant change invalidates any speculatively built mech avatars
+    if (s.humanoidRigs !== lastHumanoidRigs) {
+      lastHumanoidRigs = s.humanoidRigs;
+      drainAvatarPool();
+    }
   },
 }, DEFAULT_SETTINGS);
+
+/** current rig-variant setting (mech models load *_rig.glb when true) */
+function useHumanoidRigs(): boolean {
+  return ui.getSettings().humanoidRigs;
+}
+let lastHumanoidRigs = ui.getSettings().humanoidRigs;
 
 {
   const s = ui.getSettings();
@@ -182,7 +193,7 @@ function drainAvatarPool(): void {
 function warmMenuAssets(): void {
   if ((window as unknown as { __ccNoWarm?: boolean }).__ccNoWarm) return;
   warmer.warmAll(ROSTER.map((c) => `portraits/${c.id}.png`), 'likely');
-  warmer.warmAll(ROSTER.map((c) => c.model), 'idle');
+  warmer.warmAll(ROSTER.map((c) => modelUrl(c, useHumanoidRigs())), 'idle');
   warmer.warm('music/Cursed%20Court%20Rally%202.mp3', 'idle');
 }
 
@@ -246,12 +257,13 @@ function loadAvatarResilient(
     );
   });
 
-  return attempt(def.model).catch((err) => {
+  const url = modelUrl(def, useHumanoidRigs());
+  return attempt(url).catch((err) => {
     console.warn('retrying character load', def.id, err);
     onProgress(0);
     // three's FileLoader de-dupes by URL and will happily attach to the
     // request that just wedged, so the retry needs a distinct URL
-    return attempt(`${def.model}?retry=${Date.now()}`);
+    return attempt(`${url}?retry=${Date.now()}`);
   });
 }
 

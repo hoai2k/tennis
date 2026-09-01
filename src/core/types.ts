@@ -250,6 +250,10 @@ export interface GameSettings {
   muted: boolean;
   rumble: boolean;
   crowdDensity: 'full' | 'light';
+  /** Mech Mayhem characters: load the *_rig.glb humanoid re-rigs and drive
+   *  them with the procedural tennis animator instead of their original
+   *  fighting-game clips */
+  humanoidRigs: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -258,4 +262,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
   muted: false,
   rumble: true,
   crowdDensity: 'full',
+  humanoidRigs: false,
 };

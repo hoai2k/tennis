@@ -51,19 +51,22 @@ class AvatarImpl implements Avatar {
 
     this.rig = new Rig(root, container);
 
+    this.animator = new Animator(this.rig, def.id);
+    this.animator.update(0);
+
     // ---- racquet on the right hand ----
+    // (after the animator settles the pose, so the skin-anchor measurement
+    // in placeRacquet sees valid bone matrices)
     this.racquet = buildRacquet(def.color);
     const handR = this.rig.boneOf('handR');
     if (handR) {
+      root.updateMatrixWorld(true);
       handR.add(this.racquet.group);
       this.placeRacquet(RACQUET_EULER, RACQUET_POS);
     } else {
       // fall back: strap it to the container so the game still works
       container.add(this.racquet.group);
     }
-
-    this.animator = new Animator(this.rig, def.id);
-    this.animator.update(0);
   }
 
   getRacquetPos(out: THREE.Vector3): THREE.Vector3 {

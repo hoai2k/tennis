@@ -1,6 +1,7 @@
 /* Dev-only character viewer (charviewer.html). Not part of the game build.
  * Query params:
  *   ?id=yuji            character
+ *   ?rig=1              humanoid *_rig.glb variant (Mech Mayhem models)
  *   ?portrait=1         512x512 transparent portrait framing
  *   ?yaw=35&pitch=12&dist=3.4&ty=1  camera (degrees / meters)
  *   ?axes=1             skeleton helper
@@ -15,13 +16,15 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { characterById } from '../core/roster';
+import { characterById, modelUrl } from '../core/roster';
 import { loadAvatar } from './index';
 import type { Avatar, ShotKind, SwingSide } from '../core/types';
 
 const params = new URLSearchParams(location.search);
 const charId = params.get('id') ?? 'yuji';
 const portrait = params.get('portrait') === '1';
+/** ?rig=1 — view the humanoid *_rig.glb variant of a Mech Mayhem model */
+const humanoidRig = params.get('rig') === '1';
 
 const width = portrait ? 512 : Math.min(innerWidth, 1200);
 const height = portrait ? 512 : Math.min(innerHeight, 800);
@@ -111,7 +114,8 @@ const clock = new THREE.Clock();
 const info = document.getElementById('info');
 
 const ready = (async () => {
-  const def = characterById(charId);
+  const base = characterById(charId);
+  const def = { ...base, model: modelUrl(base, humanoidRig) };
   const av = await loadAvatar(def);
   avatar = av;
   scene.add(av.root);

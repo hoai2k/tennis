@@ -84,6 +84,7 @@ function loadSettings(initial: GameSettings): GameSettings {
       if (parsed.crowdDensity === 'full' || parsed.crowdDensity === 'light') {
         merged.crowdDensity = parsed.crowdDensity;
       }
+      if (typeof parsed.humanoidRigs === 'boolean') merged.humanoidRigs = parsed.humanoidRigs;
     }
   } catch { /* localStorage unavailable — use defaults */ }
   return merged;

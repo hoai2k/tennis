@@ -42,14 +42,32 @@ const CLIP_PICKS: Record<string, string[]> = {
   defeat: ['dead', 'knockdown'],
 };
 
+/** Per-model pick overrides, tried before the global lists. Some shared
+ *  clip names animate very differently per model: nullbot's and frogger's
+ *  'light1' jab keeps the racquet at ankle height for the whole clip, and
+ *  saurion's 'saurionClawL' claw-drag never rises above the court — no
+ *  timing fix helps those, so these models swing different moves. */
+const CLIP_PICKS_BY_ID: Record<string, Record<string, string[]>> = {
+  nullbot: { swingFore: ['light3'] },
+  frogger: { swingFore: ['light3'], overhead: ['groundPound'] },
+  saurion: { swingBack: ['saurionQuillFan'] },
+};
+
 /** estimated fraction of an attack clip where the hit lands */
 const HIT_FRAC = 0.38;
 
-/** clips whose strike lands somewhere other than the usual ~38% in.
+/** Clips whose strike lands somewhere other than the usual ~38% in.
+ *  Keys are '<characterId>/<clipName>' (clip names like 'light1'/'heavy'
+ *  are shared across models but animate differently on each) with a plain
+ *  '<clipName>' fallback. Fractions were measured in the dev viewer by
+ *  sweeping the racquet height across each clip (see NOTES.md).
  *  titanus' poundSlam raises fast and slams late, so at the default
  *  fraction the racquet was already through the floor at contact. */
 const CLIP_HIT_FRAC: Record<string, number> = {
-  poundSlam: 0.19,
+  poundSlam: 0.19,            // titanus: contact at the top of the raise (y=2.63)
+  'nullbot/heavy': 0.48,      // smash/serve: high point of the wind-through (y=1.34)
+  'frogger/groundPound': 0.47, // smash/serve: leap apex before the slam (y=1.17)
+  'frogger/light3': 0.67,     // forehand: arc peak swinging forward (y=1.38)
 };
 
 const _v = new THREE.Vector3();
@@ -171,7 +189,8 @@ export class ClipAvatar implements Avatar {
   // ------------------------- clip helpers -------------------------
 
   private pick(actionKey: string): THREE.AnimationClip | null {
-    for (const name of CLIP_PICKS[actionKey] ?? []) {
+    const own = CLIP_PICKS_BY_ID[this.def.id]?.[actionKey] ?? [];
+    for (const name of [...own, ...(CLIP_PICKS[actionKey] ?? [])]) {
       const c = this.clips.get(name);
       if (c) return c;
     }
@@ -234,7 +253,7 @@ export class ClipAvatar implements Avatar {
 
   /** timeScale that puts the clip's hit frame at SWING_CONTACT_DELAY */
   private swingTimeScale(clip: THREE.AnimationClip): number {
-    const frac = CLIP_HIT_FRAC[clip.name] ?? HIT_FRAC;
+    const frac = CLIP_HIT_FRAC[`${this.def.id}/${clip.name}`] ?? CLIP_HIT_FRAC[clip.name] ?? HIT_FRAC;
     return THREE.MathUtils.clamp((clip.duration * frac) / SWING_CONTACT_DELAY, 1.2, 4.0);
   }
 
@@ -242,7 +261,12 @@ export class ClipAvatar implements Avatar {
     const ts = this.swingTimeScale(clip);
     this.playOverride(clip, { timeScale: ts, fade: 0.05 });
     this.swingTimer = clip.duration / ts;
+    this.lastSwing = { clip: clip.name, duration: clip.duration, timeScale: ts };
   }
+
+  /** dev/debug: the most recent swing's clip + timing (used to measure
+   *  CLIP_HIT_FRAC values in the dev viewer) */
+  lastSwing: { clip: string; duration: number; timeScale: number } | null = null;
 
   // ------------------------- Avatar API -------------------------
 

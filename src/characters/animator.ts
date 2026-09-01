@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { SwingOpts, SwingSide } from '../core/types';
 import { SWING_CONTACT_DELAY } from '../core/types';
-import type { Rig } from './rig';
+import type { BoneKey, Rig } from './rig';
 import {
   Pose, Timeline, SPECS, mergeSpecs,
   easeIn, easeInCubic, easeOut, easeOutCubic, easeInOut, easeOutBack, easeLinear,
@@ -33,6 +33,94 @@ function P(name: keyof typeof SPECS & string): Pose {
   return p;
 }
 
+/* ------------------------------------------------------------------ */
+/* Per-character personality flavor, layered onto the shared states.   */
+/* Inspired by each Mech Mayhem model's own fighting-game clips        */
+/* (konga's knuckle-walk and chest-beat, saurion's raptor stance,      */
+/* titanus' ponderous stomps) so the humanoid re-rigs keep their       */
+/* characters while playing proper tennis.                             */
+/* ------------------------------------------------------------------ */
+
+interface Flavor {
+  /** additive stance rotations (degrees) blended into grounded states */
+  stance?: Partial<Record<BoneKey, [number, number, number]>>;
+  /** additive hip offset (meters) for grounded states */
+  stanceHip?: [number, number, number];
+  /** run-cycle frequency multiplier (heavy mechs stride slower) */
+  stride?: number;
+  /** custom celebration replacing the stock victory variants */
+  victory?: 'chestbeat' | 'stomp';
+}
+
+const FLAVORS: Record<string, Flavor> = {
+  titanus: {
+    // massive and planted: wide legs, chest square, arms held off the hull
+    stance: {
+      thighL: [0, 0, 8], thighR: [0, 0, -8],
+      upperArmL: [0, 0, 10], upperArmR: [0, 0, -10],
+      spine1: [-3, 0, 0],
+    },
+    stanceHip: [0, -0.02, 0],
+    stride: 0.75,
+    victory: 'stomp',
+  },
+  konga: {
+    // hunched gorilla carriage: rounded spine, head up, arms wide and low
+    stance: {
+      spine1: [14, 0, 0], spine2: [9, 0, 0], head: [-16, 0, 0],
+      shoulderL: [0, 0, 6], shoulderR: [0, 0, -6],
+      upperArmL: [4, 0, 14], upperArmR: [4, 0, -14],
+      forearmL: [10, 0, 0], forearmR: [10, 0, 0],
+      thighL: [-6, 0, 5], thighR: [-6, 0, -5],
+      shinL: [10, 0, 0], shinR: [10, 0, 0],
+    },
+    stanceHip: [0, -0.07, 0],
+    stride: 0.9,
+    victory: 'chestbeat',
+  },
+  fenrir: {
+    // feral forward lean, loping stride
+    stance: { spine1: [7, 0, 0], head: [-7, 0, 0], upperArmL: [0, 0, 7], upperArmR: [0, 0, -7] },
+    stride: 1.1,
+  },
+  vulcan: {
+    // rigid gun-platform bearing: chest up, shoulders squared, wide base
+    stance: {
+      spine1: [-4, 0, 0], shoulderL: [0, 0, -4], shoulderR: [0, 0, 4],
+      thighL: [0, 0, 6], thighR: [0, 0, -6],
+    },
+    stride: 0.85,
+  },
+  // aspirational: these three stay on clip rigs until their *_rig exports
+  // are fixed, but the flavor is ready for the day they switch over
+  saurion: {
+    stance: {
+      spine1: [16, 0, 0], spine2: [8, 0, 0], head: [-18, 0, 0],
+      thighL: [-10, 0, 4], thighR: [-10, 0, -4], shinL: [16, 0, 0], shinR: [16, 0, 0],
+      upperArmL: [8, 0, -6], upperArmR: [8, 0, 6], forearmL: [24, 0, 0], forearmR: [24, 0, 0],
+    },
+    stanceHip: [0, -0.09, 0],
+    stride: 1.15,
+  },
+  nullbot: {
+    stance: { head: [0, 9, 4], spine2: [0, 0, 3], hips: [0, 0, -2] },
+    stride: 1.05,
+  },
+  frogger: {
+    stance: {
+      thighL: [-8, 0, 16], thighR: [-8, 0, -16], shinL: [18, 0, 0], shinR: [18, 0, 0],
+      upperArmL: [0, 0, 12], upperArmR: [0, 0, -12],
+    },
+    stanceHip: [0, -0.09, 0],
+    stride: 1.1,
+  },
+};
+
+/** states that carry the personality stance (never the precise swing
+ *  timelines — contact accuracy stays untouched, and the stance blends
+ *  out naturally because a swing's first key snapshots the live pose) */
+const STANCE_STATES = new Set<StateName>(['idle', 'ready', 'run', 'charge', 'serveHold']);
+
 function hashStr(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -45,6 +133,7 @@ function hashStr(s: string): number {
 export class Animator {
   private rig: Rig;
   private seed: number;
+  private flavor: Flavor | undefined;
 
   private state: StateName = 'idle';
   private stateT = 0;
@@ -82,6 +171,7 @@ export class Animator {
 
   constructor(rig: Rig, characterId: string) {
     this.rig = rig;
+    this.flavor = FLAVORS[characterId];
     this.seed = hashStr(characterId);
     this.victoryVariant = this.seed % 2;
     this.victoryTempo = 1.5 + ((this.seed >> 3) % 5) * 0.16;
@@ -202,6 +292,7 @@ export class Animator {
     this.smZ += (this.mvZ - this.smZ) * k;
 
     this.evaluate(this.stateT, dt, this.target);
+    if (this.flavor && STANCE_STATES.has(this.state)) this.applyStance(this.target);
 
     if (this.fadeT < this.fadeDur) {
       this.fadeT += dt;
@@ -215,6 +306,17 @@ export class Animator {
   }
 
   // ------------------------------------------------ internals
+
+  private applyStance(out: Pose): void {
+    const f = this.flavor!;
+    if (f.stance) {
+      for (const key of Object.keys(f.stance) as BoneKey[]) {
+        const r = f.stance[key]!;
+        out.rot(key, r[0], r[1], r[2]);
+      }
+    }
+    if (f.stanceHip) out.hipAdd(f.stanceHip[0], f.stanceHip[1], f.stanceHip[2]);
+  }
 
   private setState(s: StateName, fade: number): void {
     this.from.copy(this.out);
@@ -285,8 +387,9 @@ export class Animator {
     const shuffle = wSide > 0.55 ? (wSide - 0.55) / 0.45 : 0;
     const back = dz < -0.35 ? THREE.MathUtils.clamp((-dz - 0.35) / 0.65, 0, 1) * (1 - shuffle) : 0;
 
-    // stride frequency scales with speed (full cycle = 2 steps)
-    const freq = (1.35 + 0.17 * speed) * (1 + 0.18 * shuffle);
+    // stride frequency scales with speed (full cycle = 2 steps);
+    // heavy mechs stride slower, skittery ones quicker
+    const freq = (1.35 + 0.17 * speed) * (1 + 0.18 * shuffle) * (this.flavor?.stride ?? 1);
     this.runPhase = (this.runPhase + dt * freq * TWO_PI) % (TWO_PI * 1024);
     const ph = this.runPhase;
     const s = Math.sin(ph);
@@ -390,6 +493,8 @@ export class Animator {
   }
 
   private evalVictory(t: number, out: Pose): void {
+    if (this.flavor?.victory === 'chestbeat') return this.evalChestbeat(t, out);
+    if (this.flavor?.victory === 'stomp') return this.evalStomp(t, out);
     const tempo = this.victoryTempo;
     const ph = t * TWO_PI * tempo;
     const hop = Math.max(0, Math.sin(ph));
@@ -424,6 +529,47 @@ export class Animator {
       out.rot('shinR', 20 * land, 0, 0);
       out.hipAdd(0, -0.04 * land, 0);
     }
+  }
+
+  /** konga: gorilla chest-beat — alternating forearms hammering the chest */
+  private evalChestbeat(t: number, out: Pose): void {
+    out.copy(P('victoryUp')).scale(0.45); // arms part-raised base
+    // rear up out of the hunched stance for the display
+    out.rot('spine1', -10, 0, 0);
+    out.rot('head', -8, 0, 0);
+    const ph = t * TWO_PI * 2.7;
+    const beatL = Math.max(0, Math.sin(ph));
+    const beatR = Math.max(0, -Math.sin(ph));
+    out.rot('upperArmL', -26 * beatL, 0, 24 - 12 * beatL);
+    out.rot('forearmL', 55 + 45 * beatL, 0, 0);
+    out.rot('upperArmR', -26 * beatR, 0, -(24 - 12 * beatR));
+    out.rot('forearmR', 55 + 45 * beatR, 0, 0);
+    // torso rocks with each beat, hips bounce
+    out.rot('spine2', 4 * Math.sin(ph), 0, 2 * Math.sin(ph * 0.5));
+    out.hipAdd(0, 0.025 * Math.abs(Math.sin(ph)), 0);
+  }
+
+  /** titanus: slow triumphant stomps, arms flexed overhead */
+  private evalStomp(t: number, out: Pose): void {
+    out.copy(P('victoryUp'));
+    const ph = t * TWO_PI * 1.05; // ponderous
+    const s = Math.sin(ph);
+    const stompL = Math.max(0, s);
+    const stompR = Math.max(0, -s);
+    out.rot('thighL', -38 * stompL, 0, 4 * stompL);
+    out.rot('shinL', 44 * stompL, 0, 0);
+    out.rot('thighR', -38 * stompR, 0, -4 * stompR);
+    out.rot('shinR', 44 * stompR, 0, 0);
+    // the whole hull drops as each foot slams down
+    const slam = Math.max(0, -Math.cos(ph + 0.5)) ** 2;
+    out.hipAdd(0.02 * s, -0.05 * slam, 0);
+    out.rot('hips', 0, 0, -5 * s);
+    out.rot('spine1', 3 * Math.abs(s) - 2, 0, 4 * s);
+    // fists pump alternately with the stomps
+    out.rot('upperArmL', -8 * stompL, 0, 6 * stompL);
+    out.rot('upperArmR', -8 * stompR, 0, -6 * stompR);
+    out.rot('forearmL', 18 * stompL, 0, 0);
+    out.rot('forearmR', 18 * stompR, 0, 0);
   }
 
   private evalDefeat(t: number, out: Pose): void {
