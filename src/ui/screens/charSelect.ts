@@ -182,6 +182,13 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
     curs.forEach((c, i) => c.style.setProperty('--stack', String(i)));
   }
 
+  /** tell the game which character is under a cursor, so it can start
+   *  pulling that model down while the player is still deciding */
+  function noteHover(gridIdx: number): void {
+    const def = ROSTER[gridIdx];
+    if (def) ctx.cb.onCharacterHover?.(def.id);
+  }
+
   function moveCursorTo(cur: HumanCursor | 'cpu', gridIdx: number): void {
     if (cur === 'cpu') {
       const old = cpuCursorEl?.parentElement;
@@ -189,12 +196,14 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       if (cpuCursorEl) placeCursor(cpuCursorEl, gridIdx);
       if (old) restack(old);
       showInfo(ROSTER[gridIdx]);
+      noteHover(gridIdx);
     } else {
       const old = cur.el.parentElement;
       cur.grid = gridIdx;
       placeCursor(cur.el, gridIdx);
       if (old) restack(old);
       showInfo(ROSTER[gridIdx]);
+      noteHover(gridIdx);
     }
   }
 
@@ -354,6 +363,8 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       h.el.classList.add('cc-cursor-locked');
       pop(cards[h.grid], 'cc-card-pop');
       ctx.sfx('menu_confirm');
+      // definitely needed now — start building this avatar for real
+      ctx.cb.onCharacterLocked?.(ROSTER[h.grid].id);
       refreshSlots();
       afterHumanLock();
     } else if (action === 'back') {
@@ -372,6 +383,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       cpuPicks.push(ROSTER[cpuGrid].id);
       pop(cards[cpuGrid], 'cc-card-pop');
       ctx.sfx('menu_confirm');
+      ctx.cb.onCharacterLocked?.(ROSTER[cpuGrid].id);
       if (cpuPicks.length >= cpuSlotCount()) {
         finish();
       } else {

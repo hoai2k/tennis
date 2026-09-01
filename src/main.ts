@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DEFAULT_SETTINGS, type Avatar, type CharacterId, type ControlSource, type CourtThemeDef, type MatchResult, type MatchSetup, type PlayerSlot } from './core/types';
-import { characterById } from './core/roster';
+import { ROSTER, characterById } from './core/roster';
+import { AssetWarmer } from './core/warm';
 import { InputManager } from './core/input';
 import { createAudio } from './audio';
 import { createUI, type UiApi } from './ui';
@@ -87,6 +88,16 @@ const ui: UiApi = createUI(uiRoot, {
     audio.setMusic('menu');
     ui.showMainMenu();
   },
+  onCharacterHover(id) {
+    // dwelling on a card promotes that model up the warm queue
+    warmer.warm(characterById(id).model, 'likely');
+  },
+  onCharacterLocked(id) {
+    // wanted for certain: finish the download and build the avatar now
+    warmer.warm(characterById(id).model, 'certain');
+    const inMatchAlready = avatarPool.get(id)?.length ?? 0;
+    preloadAvatarFor(id, inMatchAlready + 1);
+  },
   onSettingsChanged(s) {
     audio.setMusicVolume(s.musicVolume);
     audio.setSfxVolume(s.sfxVolume);
@@ -122,6 +133,51 @@ input.onMenuAction((action, pad) => {
  * we start loading them the moment the roster is locked in — while the player
  * is still choosing a court. By the time they hit PLAY the models are usually
  * already in memory and the loading bar just flashes to 100%. */
+/* ---------- speculative loading ----------
+ * Menus are idle time we can spend. The warmer pulls bytes into the HTTP
+ * cache (network only, no parsing), and characters that a player actually
+ * locks in get built into real Avatars straight away, so by the time the
+ * court screen appears the models are usually finished. */
+
+const warmer = new AssetWarmer();
+
+/** avatars already built, keyed by character (two players may pick the same) */
+const avatarPool = new Map<CharacterId, Promise<Avatar>[]>();
+
+/** kick off a full load (fetch + parse + rig) for a character we know is wanted */
+function preloadAvatarFor(id: CharacterId, wanted = 1): void {
+  if ((window as unknown as { __ccNoWarm?: boolean }).__ccNoWarm) return;
+  const list = avatarPool.get(id) ?? [];
+  while (list.length < wanted) list.push(loadAvatarResilient(characterById(id), () => {}));
+  for (const pr of list) pr.catch(() => {}); // failures resurface where awaited
+  avatarPool.set(id, list);
+}
+
+/** take a pre-built avatar for this character, if one is waiting */
+function takeAvatar(id: CharacterId): Promise<Avatar> | null {
+  const list = avatarPool.get(id);
+  if (!list || !list.length) return null;
+  const pr = list.shift()!;
+  if (!list.length) avatarPool.delete(id);
+  return pr;
+}
+
+/** throw away anything speculative we ended up not needing */
+function drainAvatarPool(): void {
+  for (const list of avatarPool.values()) {
+    for (const pr of list) pr.then((a) => a.dispose()).catch(() => {});
+  }
+  avatarPool.clear();
+}
+
+/** portraits + models the character-select screen will want next */
+function warmMenuAssets(): void {
+  if ((window as unknown as { __ccNoWarm?: boolean }).__ccNoWarm) return;
+  warmer.warmAll(ROSTER.map((c) => `portraits/${c.id}.png`), 'likely');
+  warmer.warmAll(ROSTER.map((c) => c.model), 'idle');
+  warmer.warm('music/Cursed%20Court%20Rally%202.mp3', 'idle');
+}
+
 interface Prefetch {
   key: string;
   fracs: number[];
@@ -196,13 +252,17 @@ function beginPrefetch(slots: { characterId: CharacterId }[]): Prefetch {
   const fracs = defs.map(() => 0);
   const done = defs.map(() => false);
   const promise = Promise.all(
-    defs.map((d, i) =>
-      loadAvatarResilient(d, (f) => { fracs[i] = f; }).then((a) => {
+    defs.map((d, i) => {
+      // a locked-in character is usually already loading from the select screen
+      const pooled = takeAvatar(d.id);
+      if (pooled) fracs[i] = 1;
+      const load = pooled ?? loadAvatarResilient(d, (f) => { fracs[i] = f; });
+      return load.then((a) => {
         fracs[i] = 1;
         done[i] = true;
         return a;
-      }),
-    ),
+      });
+    }),
   );
   promise.catch(() => {}); // a failure is surfaced where it is awaited
   prefetch = { key: slotsKey(slots), fracs, done, promise };
@@ -245,8 +305,10 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
   if (loadInFlight) return; // ignore a double confirm
   loadInFlight = true;
   state = 'loading';
+  const loadStart = performance.now();
   ui.hideAll();
   ui.showLoading();
+  warmer.setPaused(true); // foreground load owns the connection now
 
   const tick = window.setInterval(() => {
     if (prefetch) ui.setLoadingProgress(prefetchProgress(prefetch) * 0.97);
@@ -285,6 +347,7 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
       ui.showVictory(result);
     };
 
+    (window as unknown as { __loadMs?: number }).__loadMs = Math.round(performance.now() - loadStart);
     state = 'match';
     audio.setMusic('gameplay');
     ui.hideLoading();
@@ -296,6 +359,8 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
     window.clearInterval(tick);
     window.clearTimeout(watchdog);
     loadInFlight = false;
+    warmer.setPaused(false);
+    drainAvatarPool(); // release any speculative avatars we didn't use
   }
 }
 
@@ -310,6 +375,14 @@ function endMatch(): void {
 
 // ---------- main loop ----------
 
+/** true while speculative fetches or avatar builds are still running */
+function backgroundWorkPending(): boolean {
+  if (avatarPool.size > 0) return true;
+  const st = warmer.stats();
+  return st.inFlight > 0 || st.queued > 0;
+}
+
+let menuFrameToggle = false;
 let last = performance.now();
 function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
@@ -326,11 +399,23 @@ function frame(now: number): void {
     matchCam.idleOrbit(idleT);
   }
 
-  renderer.render(scene, matchCam.camera);
+  // While assets are loading in the background, halve the menu frame rate.
+  // The orbiting court doesn't need 60fps, and parsing a rigged GLB is main
+  // thread work — giving it the spare time is what makes the pre-loading pay
+  // off instead of the two just fighting each other.
+  let skip = false;
+  if (state !== 'match' && state !== 'victory' && backgroundWorkPending()) {
+    menuFrameToggle = !menuFrameToggle;
+    skip = menuFrameToggle;
+  }
+  if (!skip) renderer.render(scene, matchCam.camera);
   requestAnimationFrame(frame);
 }
 
 ui.showTitle();
+// start warming while the player is still reading the title screen —
+// fetching needs no user gesture, and idle callbacks keep it out of the way
+warmMenuAssets();
 requestAnimationFrame(frame);
 
 // ---------- debug hooks (used by automated tests; harmless in prod) ----------
@@ -340,6 +425,8 @@ const params = new URLSearchParams(location.search);
   get state() { return state; },
   get match() { return match; },
   ui, input, audio,
+  poolSize: () => [...avatarPool.values()].reduce((n, l) => n + l.length, 0),
+  warmStats: () => warmer.stats(),
   get camera() { return matchCam.camera; },
   /** advance the simulation synchronously (headless testing — rendering
    *  still happens on the next rAF) */

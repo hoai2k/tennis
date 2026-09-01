@@ -35,6 +35,10 @@ export interface UiCallbacks {
   onResume(): void;         // modal closed during match
   onQuitToMenu(): void;     // from pause menu / victory
   onSettingsChanged(s: GameSettings): void;
+  /** a cursor is resting on this character — a good candidate to pre-load */
+  onCharacterHover?(id: CharacterId): void;
+  /** a player locked this character in — it is definitely needed */
+  onCharacterLocked?(id: CharacterId): void;
 }
 
 export interface UiApi {
