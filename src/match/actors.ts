@@ -27,6 +27,26 @@ const SPRINT_REGEN_DELAY = 0.35;
 /** after bottoming out, this much must be banked before sprinting again */
 const SPRINT_UNLOCK_AT = 0.25;
 
+/* --- side anticipation ---
+ * The left stick, not the ball, picks which side you wind up on: lean right
+ * and the racquet comes round to the forehand, lean left and it goes to the
+ * backhand. Reading the ball's side correctly (so the racquet is already
+ * turned that way at contact) is worth a little power and a little extra
+ * range; leaning the wrong way costs the same. Kept deliberately small —
+ * Mario Tennis does not reward the read this explicitly, so this should feel
+ * like an edge for a player who anticipates, never like a mechanic you must
+ * solve to rally. */
+/** stick must be pushed at least this far to count as committing to a side */
+const LEAN_DEADZONE = 0.3;
+/** ...and this far to count as a full commitment (linear ramp in between) */
+const LEAN_FULL = 0.75;
+/** a ball within this much of straight-on has no meaningful side to read */
+const LEAN_MIN_OFFSET = 0.12;
+/** power swing between a fully right and fully wrong read (±9%) */
+export const ANTICIPATION_POWER = 0.09;
+/** reach swing between a fully right and fully wrong read (±7%) */
+export const ANTICIPATION_REACH = 0.07;
+
 export class Actor {
   readonly pos: THREE.Vector3;
   vel = new THREE.Vector3();
@@ -46,6 +66,11 @@ export class Actor {
   readonly spinMul: number;
   /** pad for rumble (humans only) */
   pad: PadState | null = null;
+
+  /** world-space stick lean along x, refreshed every frame by the controller
+   *  for humans. AI leaves it at 0, which reads as "no commitment" — the
+   *  anticipation bonus and penalty are a human-input mechanic. */
+  leanX = 0;
 
   /* --- sprint (hold LB): sustained extra speed, spends stamina --- */
   /** 0..1 stamina; drains while sprinting, recovers when you let go */
@@ -89,6 +114,29 @@ export class Actor {
   sideForBallX(ballX: number): SwingSide {
     const rightWorld = this.team === 0 ? 1 : -1;
     return Math.sign(ballX - this.pos.x) * rightWorld >= 0 ? 'fore' : 'back';
+  }
+
+  /** the side a world-space stick lean of `leanX` is asking for */
+  sideForLeanX(leanX: number): SwingSide {
+    const rightWorld = this.team === 0 ? 1 : -1;
+    return leanX * rightWorld >= 0 ? 'fore' : 'back';
+  }
+
+  /** true while the stick is pushed far enough to claim a side */
+  get isLeaning(): boolean { return Math.abs(this.leanX) > LEAN_DEADZONE; }
+
+  /**
+   * How well the wind-up anticipates where the ball actually is, -1..1:
+   * +1 the racquet is already round on the ball's side, -1 it is turned the
+   * other way, 0 no commitment (stick centred, or the ball is straight at
+   * you). Scaled by how hard the stick is held, so a feathered stick reads
+   * as a soft guess rather than a called shot.
+   */
+  anticipation(ballX: number): number {
+    if (!this.isLeaning) return 0;
+    if (Math.abs(ballX - this.pos.x) < LEAN_MIN_OFFSET) return 0;
+    const mag = Math.min(1, (Math.abs(this.leanX) - LEAN_DEADZONE) / (LEAN_FULL - LEAN_DEADZONE));
+    return (this.chargeSide === this.sideForBallX(ballX) ? 1 : -1) * mag;
   }
 
   beginCharge(btn: 'a' | 'b' | 'x' | 'y', side: SwingSide): void {
@@ -151,6 +199,16 @@ export class Actor {
     if (this.charging) {
       this.chargeTime += dt;
       if (this.comboT > 0) this.comboT -= dt;
+      // The stick keeps steering the wind-up right up to contact: push the
+      // other way mid-charge and the racquet swaps sides visibly, which is
+      // the feedback the anticipation bonus is scored against.
+      if (this.isLeaning && !this.avatar.isSwinging()) {
+        const want = this.sideForLeanX(this.leanX);
+        if (want !== this.chargeSide) {
+          this.chargeSide = want;
+          this.avatar.startCharge(want);
+        }
+      }
     }
 
     // a lunge overrides normal locomotion until it lands
@@ -226,5 +284,6 @@ export class Actor {
     this.lungeT = this.lungeDur = 0;
     this.sprinting = false;
     this.sprintHeld = false;
+    this.leanX = 0;
   }
 }

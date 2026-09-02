@@ -147,3 +147,16 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Measured 8/8 legal serves per button with a clean depth spread:
       X 2.1m (33% of the box), B 3.7m (58%), A 4.2m (66%), Y 5.0m (78%)
 - [x] Controls screen documents the serve buttons
+
+## Phase 14 — Side anticipation
+- [x] The left stick now picks the swing side: lean right and the wind-up
+      comes round to the forehand, lean left and it goes to the backhand.
+      It re-steers every frame, so swapping the stick mid-charge visibly
+      swings the racquet across before contact
+- [x] Reading the side correctly (racquet already turned toward where the
+      ball really is) pays a small bonus; leaning away costs the same.
+      Measured: power 1.008 / 1.108 / 1.207 for a wrong / neutral / right
+      read (±9%), and max reach 2.97 / 3.19 / 3.41 m (±7%, i.e. ±0.22 m)
+- [x] The read ramps in over the stick's travel (nothing below 0.3, full
+      at 0.75) and stays at 0 for a ball hit straight at the player
+- [x] AI is untouched — it never sets a lean, so it scores neutral

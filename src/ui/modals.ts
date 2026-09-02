@@ -248,6 +248,7 @@ export function createInstructionsModal(ctx: UiCtx, close: () => void): Modal {
     ['Hold LB', 'SPRINT — steer freely, swing any time'],
     ['Hold early', 'CHARGE the shot for extra power'],
     ['Swing from a ⭐', 'STAR SHOT!'],
+    ['Lean the stick', 'Picks forehand / backhand — read the side for power & reach'],
     ['Serve', 'Any button tosses · press again at the peak = power'],
     ['Serve type', 'A topspin · B slice · X drop · Y flat'],
   ];

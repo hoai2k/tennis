@@ -91,6 +91,7 @@ export class ClipAvatar implements Avatar {
 
   private swingTimer = 0;
   private charging = false;
+  private chargeSide: SwingSide = 'fore';
 
   private racquet: Racquet;
   private materials: THREE.MeshStandardMaterial[];
@@ -303,8 +304,11 @@ export class ClipAvatar implements Avatar {
   }
 
   startCharge(side: SwingSide): void {
-    if (this.charging) return;
+    // re-entrant: the stick can swap the wind-up side mid-charge, and the
+    // racquet has to visibly come round when it does
+    if (this.charging && this.chargeSide === side) return;
     this.charging = true;
+    this.chargeSide = side;
     const clip = this.pick(side === 'back' ? 'chargeBack' : 'chargeFore');
     if (clip) this.playOverride(clip, { loop: true, timeScale: 0.9, fade: 0.12 });
   }
