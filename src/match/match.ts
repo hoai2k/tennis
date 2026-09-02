@@ -113,7 +113,8 @@ export class MatchController {
       onDead: () => this.handleDead(),
     };
 
-    // fixed for the life of the match: drives per-pane input orientation
+    // drives per-pane input orientation; the game keeps this in step with
+    // the camera setting (see setSplitView)
     this.splitView = this.needsSplitView;
 
     this.phase = 'intro';
@@ -620,6 +621,15 @@ export class MatchController {
       this.handleDead();
     }
 
+    // Between points the controls stay alive for practice swings. This must
+    // run BEFORE driveIntents, which drops any wind-up whose button is no
+    // longer held — otherwise the release is cancelled before it can swing
+    // (the rally path gets this ordering from the phase switch above).
+    if (this.phase !== 'rally' && this.phase !== 'serveFlight'
+        && this.phase !== 'victory' && this.phase !== 'done') {
+      this.processIdleSwings();
+    }
+
     // actors
     this.driveIntents(dt);
     for (const a of this.actors) a.update(dt);
@@ -783,6 +793,45 @@ export class MatchController {
     }
   }
 
+  /**
+   * Between points there is nothing to hit, but a player waiting on a serve
+   * still wants to feel the controls — winding up and swinging at air is how
+   * you learn the timing. Humans may swing freely in the idle phases; the
+   * ball is not live, so these are purely animation. The server is left out
+   * while they are on the ball: their A button is the toss.
+   */
+  private processIdleSwings(): void {
+    for (const a of this.actors) {
+      if (!a.isHuman || !a.pad) continue;
+      const isServerOnBall =
+        a === this.server && (this.phase === 'servePrep' || this.phase === 'serveToss');
+      if (isServerOnBall) continue;
+
+      let btn: 'a' | 'b' | 'x' | 'y' | '' = '';
+      if (a.pad.pressed('a')) btn = 'a';
+      else if (a.pad.pressed('b')) btn = 'b';
+      else if (a.pad.pressed('x')) btn = 'x';
+      else if (a.pad.pressed('y')) btn = 'y';
+
+      if (btn) {
+        if (a.charging) a.comboPress(btn);
+        else if (a.swingLock <= 0) {
+          // no live ball to read a side from — let the stick pick, as the
+          // player would when lining a real shot up
+          // stick-right is the character's racquet side in EITHER pane, so
+          // the raw screen-relative stick is the right thing to read here
+          const side = a.pad.moveX < -0.3 ? 'back' : 'fore';
+          a.beginCharge(btn, side);
+          this.deps.audio.chargeLoop(true);
+        }
+      }
+      // releasing swings through, exactly as a whiffed shot does in a rally
+      if (a.charging && a.chargeBtn && a.pad.released(a.chargeBtn)) {
+        this.whiffSwing(a);
+      }
+    }
+  }
+
   private processShotInputs(): void {
     if (this.phase !== 'rally' && this.phase !== 'serveFlight') return;
     for (const a of this.actors) {
@@ -841,6 +890,13 @@ export class MatchController {
     const t0 = this.teamActors(0).some((a) => a.isHuman);
     const t1 = this.teamActors(1).some((a) => a.isHuman);
     return t0 && t1;
+  }
+
+  /** Tell the match whether two panes are actually being rendered, so stick
+   *  input is read in the frame the player is really looking at. Follows the
+   *  MULTI-VIEW / SINGLE camera setting, which can change mid-match. */
+  setSplitView(on: boolean): void {
+    this.splitView = on;
   }
 
   /**

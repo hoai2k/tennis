@@ -85,6 +85,9 @@ function loadSettings(initial: GameSettings): GameSettings {
         merged.crowdDensity = parsed.crowdDensity;
       }
       if (typeof parsed.humanoidRigs === 'boolean') merged.humanoidRigs = parsed.humanoidRigs;
+      if (parsed.cameraView === 'multi' || parsed.cameraView === 'single') {
+        merged.cameraView = parsed.cameraView;
+      }
     }
   } catch { /* localStorage unavailable — use defaults */ }
   return merged;

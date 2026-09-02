@@ -115,8 +115,19 @@ const ui: UiApi = createUI(uiRoot, {
       lastHumanoidRigs = s.humanoidRigs;
       drainAvatarPool();
     }
+    applyCameraView(); // MULTI-VIEW / SINGLE can be flipped mid-match
   },
 }, DEFAULT_SETTINGS);
+
+/** Two panes only when rivals share the screen AND the player wants them. */
+function applyCameraView(): void {
+  const want = !!match && match.needsSplitView && ui.getSettings().cameraView === 'multi';
+  if (want === splitView) return;
+  splitView = want;
+  match?.setSplitView(splitView);
+  ui.setSplitView(splitView, match ? match.slotTeams() : []);
+  resize(); // pane aspect differs from the full-screen one
+}
 
 /** current rig-variant setting (mech models load *_rig.glb when true) */
 function useHumanoidRigs(): boolean {
@@ -368,7 +379,8 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
     };
 
     (window as unknown as { __loadMs?: number }).__loadMs = Math.round(performance.now() - loadStart);
-    splitView = match.needsSplitView;
+    splitView = match.needsSplitView && ui.getSettings().cameraView === 'multi';
+    match.setSplitView(splitView);
     ui.setSplitView(splitView, match.slotTeams());
     resize(); // pane aspect differs from the full-screen one
 

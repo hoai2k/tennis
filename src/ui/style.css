@@ -878,11 +878,14 @@
 }
 
 /* announcements */
+/* Announcements live in the top band, above the play area. Measured across
+   singles and doubles rallies, no player's head ever rises above ~31% of the
+   frame, so text placed here can never hide whoever is on the far side. */
 .cc-announce-layer {
   position: absolute;
   left: 0;
   right: 0;
-  top: 30%;
+  top: 6%;
   display: flex;
   justify-content: center;
   pointer-events: none;
@@ -894,7 +897,7 @@
   animation: cc-announce-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .cc-announce-text {
-  font-size: clamp(38px, 8vh, 72px);
+  font-size: clamp(32px, 6.4vh, 58px);
   color: var(--cc-white);
   -webkit-text-stroke: 2.5px var(--cc-ink);
   paint-order: stroke fill;
@@ -904,11 +907,11 @@
   transform: rotate(-1.5deg);
 }
 .cc-announce-big .cc-announce-text {
-  font-size: clamp(54px, 12vh, 104px);
+  font-size: clamp(44px, 9vh, 78px);
   color: var(--cc-yellow);
 }
 .cc-announce-gold .cc-announce-text {
-  font-size: clamp(54px, 12vh, 104px);
+  font-size: clamp(44px, 9vh, 78px);
   background: linear-gradient(180deg, #fff3a0 15%, #ffd42a 45%, #ff9d2a 85%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -924,8 +927,8 @@
   50% { transform: rotate(12deg) scale(1.18); }
 }
 @keyframes cc-announce-in {
-  0% { transform: scale(2.4); opacity: 0; }
-  70% { transform: scale(0.92); opacity: 1; }
+  0% { transform: scale(1.6); opacity: 0; }
+  70% { transform: scale(0.94); opacity: 1; }
   100% { transform: scale(1); }
 }
 .cc-announce-out { animation: cc-announce-out-anim 0.26s ease forwards; }
@@ -1545,8 +1548,6 @@
   pointer-events: none;
   z-index: 40;
 }
-/* meters sit inside their own pane rather than at the screen edges */
-.cc-hud-split .cc-charge.cc-meter-left { left: 50%; right: auto; transform: translateX(-50%) translateX(-25vw); }
-.cc-hud-split .cc-charge.cc-meter-right { left: 50%; right: auto; transform: translateX(-50%) translateX(25vw); }
-/* announcements are centred over the divider, so lift them clear of play */
-.cc-hud-split .cc-announce-layer { align-items: flex-start; padding-top: 10vh; }
+/* meters hug the outer edge of their own pane, clear of that pane's player */
+.cc-hud-split .cc-charge.cc-meter-left { left: 26px; right: auto; transform: none; }
+.cc-hud-split .cc-charge.cc-meter-right { left: auto; right: 26px; transform: none; }

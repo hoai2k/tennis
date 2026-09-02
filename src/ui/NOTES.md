@@ -50,3 +50,17 @@
   matches.
 - Fullscreen corner button calls `requestFullscreen`/`exitFullscreen`
   directly on `document.documentElement` (per plan).
+
+## HUD placement rule
+
+In-match announcements live in the **top band above the play area**
+(`.cc-announce-layer`, `top: 6%`). The camera's framing keeps every player
+below ~30% of the frame, so text placed here can never hide the far-side
+player — which it did when the layer sat at `top: 30%`. If announcement
+font sizes grow, re-check the gap: drive a live doubles rally and compare
+`.cc-announce-text`'s `getBoundingClientRect().bottom` against the
+projected screen y of each actor's head (`pos.y + 2.4`).
+
+Split view is side-by-side (P1 left, P2 right) and is opt-out via the
+CAMERA setting; charge/stamina meters hug the outer edge of their own pane
+so they never sit on that pane's player.

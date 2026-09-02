@@ -256,6 +256,9 @@ export interface GameSettings {
    *  proper tennis form (real ready stance, charge wind-up, frame-exact
    *  contact) that the repurposed fighting-game clips can't match. */
   humanoidRigs: boolean;
+  /** when humans face each other: 'multi' gives each their own pane,
+   *  'single' keeps one shared camera behind team 0's baseline */
+  cameraView: 'multi' | 'single';
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -265,4 +268,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
   rumble: true,
   crowdDensity: 'full',
   humanoidRigs: true,
+  cameraView: 'multi',
 };

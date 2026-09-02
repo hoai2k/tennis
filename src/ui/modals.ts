@@ -173,6 +173,9 @@ export function createSettingsModal(ctx: UiCtx, close: () => void): Modal {
   rows.push(toggle('CROWD', ['FULL', 'LIGHT'],
     () => (ctx.settings.crowdDensity === 'full' ? 0 : 1),
     (i) => { ctx.settings.crowdDensity = i === 0 ? 'full' : 'light'; }));
+  rows.push(toggle('CAMERA', ['MULTI-VIEW', 'SINGLE'],
+    () => (ctx.settings.cameraView === 'multi' ? 0 : 1),
+    (i) => { ctx.settings.cameraView = i === 0 ? 'multi' : 'single'; }));
   rows.push(toggle('MECH RIGS', ['ORIGINAL', 'HUMANOID'],
     () => (ctx.settings.humanoidRigs ? 1 : 0),
     (i) => { ctx.settings.humanoidRigs = i === 1; }));

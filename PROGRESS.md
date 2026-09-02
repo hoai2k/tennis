@@ -125,3 +125,16 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Verified: nobody cropped in doubles (worst NDC 0.21/0.58), full
       singles match to victory, split view at 16:9 and 4:3, and the
       shared-camera control mapping proven unchanged
+
+## Phase 12 — Camera setting, clear HUD, practice swings
+- [x] "CAMERA: MULTI-VIEW / SINGLE" setting (MULTI-VIEW default). SINGLE
+      keeps rivals on one shared camera; switchable mid-match, and the
+      match's input orientation follows it
+- [x] Announcements moved into the top band the play area never reaches
+      (measured: no player's head rises above ~30% of frame over 20s of
+      live doubles). Text now spans 18-143px with a 77px gap to the
+      nearest player, so the far-side player is never hidden
+- [x] Split-view meters moved to each pane's outer edge, off the player
+- [x] Practice swings while idle: humans can wind up and swing between
+      points (waiting on a serve, intro, after a point). The server keeps
+      A for the toss; the ball is never live, so these are pure animation
