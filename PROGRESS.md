@@ -191,3 +191,24 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] The read ramps in over the stick's travel (nothing below 0.3, full
       at 0.75) and stays at 0 for a ball hit straight at the player
 - [x] AI is untouched — it never sets a lean, so it scores neutral
+
+## Phase 16 — Arm bones no longer drag the body
+- [x] `skinFix.ts`: load-time skin-weight repair. Tripo auto-skinned these
+      models by proximity in a bind pose with the arms at the sides, so the
+      hand bones had picked up thigh, skirt, shin and coat geometry and
+      carried it along on every swing
+- [x] Measured with an arm-only rotation, as a fraction of body height:
+      tusken's shin+robe moved 0.658 (`DEF-handL` owned it at weight 1.0),
+      duelist's coat tails 0.384, quarren's thigh 0.288, din 0.146,
+      nobara's skirt hem 0.097, vulcan's skirt panels 0.453 on `elbowR`
+- [x] The discriminator is distance in the arm bone's own lengths: the bad
+      weights sit 4-10 hand-lengths from the hand, real arm flesh well
+      inside one. Combined with a relative test and a "keep whatever the
+      bone is closest to" gate so deltoid/trapezius weights survive
+- [x] Skips skeletons it cannot read: frogger/nullbot/saurion's original
+      rigs are ~65% `bone_17`-style unnamed bones. Their `_rig` re-exports
+      (the default) are clean and fully repaired
+- [x] After: dragged body vertices 0 on all 13 humans and all 7 `_rig`
+      mechs, worst-case body movement under 0.01 H, arm motion unchanged
+      (duelist 0.1980 → 0.1976). Cost 7-100 ms per model on the warm path
+- [x] `/skinaudit.html` dev harness to check future model drops

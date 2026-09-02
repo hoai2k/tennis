@@ -14,11 +14,69 @@ so at the default it had already driven the racquet into the floor by contact
   - **Flavor stances must not bury the racquet.** The racquet hangs from the hand, so a deep hunch/crouch swings it *below the court* — the first konga/saurion stances did exactly that (racquet at −0.20 m at rest, vs 0.81 m unflavored). Both now keep the crouch in the spine/legs/left arm and leave the racquet arm alone; konga's arms reach the floor unaided, so any droop on that side is unaffordable. Verified floor: every mech's racquet clears y=0 in ready/run/swing/serve/victory (`hrig-*` screenshots).
   - History: the saurion/nullbot/frogger `*_rig` exports were initially misaligned — the DEF skeleton sat outside the mesh in bind space, so posing them dragged geometry toward wrong pivots. Fixed at the source (3rd re-export). The check that caught it: load the raw GLB, take the **skinned** bind-pose bounds (not the raw geometry box — that is meaningless for a skinned mesh) and count how many DEF bones fall inside. Aligned models score 33/33 with hips ≈40-55% and head ≈70-90% of body height; the broken ones scored 11-23/33 with bones below the feet.
 
+- `skinFix.ts` — **arm→body skin-weight repair, run on every model at load** (see below).
 - `rig.ts` — bone mapping, hierarchy repair, canonical re-targeting (the important part, see below).
 - `poses.ts` — pose math (quat blending, easing, timelines) + the authored pose library.
 - `animator.ts` — procedural animation state machine (idle/ready/run/charge/swing/serve/victory/defeat).
 - `racquet.ts` — procedural cartoon racquet (~0.68 m), accent-colored per character.
 - `devViewer.ts` + `/charviewer.html` — dev-only viewer (`npx vite`, open `/charviewer.html?id=yuji`). Buttons for every animation; `window.drive(action, t)` steps deterministically for screenshots; `?portrait=1` renders the character-select portrait framing.
+
+## Arm bones dragging the body (`skinFix.ts`)
+
+Tripo auto-skins by proximity **in the bind pose**, and every model here binds
+with its arms hanging at its sides. So the hand sits centimetres from the
+thigh, the skirt, the shin or the coat, and a slice of that lower-body
+geometry gets handed to `DEF-handL/R` instead of to the leg it belongs to.
+Every swing then dragged it along. Measured with an arm-only rotation, as a
+fraction of body height, before the fix:
+
+| model | what moved | owned by | distance |
+|---|---|---|---|
+| tusken | shin + robe, 0.658 H | `DEF-handL` @ **1.00** | 6.9 hand-lengths |
+| duelist | coat tails, 0.384 H | `DEF-handR` @ 0.44 | 10.4 |
+| quarren | thigh, 0.288 H | `DEF-handR` @ 0.44 | 8.8 |
+| din | shin + tabard, 0.146 H | `DEF-handL/R` @ 0.23 | 6.4 |
+| nobara | skirt hem + pelvis, 0.097 H | `DEF-handR` @ 0.20 | 4.6 |
+| vulcan | skirt panels, 0.453 H | `elbowR` @ **1.00** | ratio 3.3 |
+| konga/titanus/vulcan `_rig` | chest + head collapsing inward | `DEF-shoulderL/R` @ 0.2-0.3 | ratio 2-3 |
+
+**The rule.** An arm bone's influence is spurious when the vertex hugs some
+non-arm bone far more closely than it hugs that arm bone. "Arm" is decided by
+**hierarchy, not name** — the subtree under each arm-named root — so fingers,
+claws, fists and weapon bones parented to a hand still count as arm and keep
+their weights. Three guards keep it honest:
+
+1. An arm bone always keeps whatever it is the **closest** thing to. That is
+   its own flesh plus the deltoid/trapezius that legitimately rides it.
+   Without this gate the pass ate real arm deformation (−31% on jogo).
+2. Two tests, whichever is harsher: a **relative** one (2.0→2.8× closer to the
+   body) and an **absolute** one in the arm bone's **own lengths** (2.0→3.5).
+   The second is what actually catches the damage — a hand is ~10 cm long and
+   can only credibly skin flesh within about a hand-length, while the bad
+   weights sit 4-10 hand-lengths out. Legit deltoid geometry sits well inside
+   one bone length and survives both.
+3. Weight is removed on a smooth ramp (no seam at the cutoff) and
+   renormalised; a vertex left with nothing goes to the body bone it hugs.
+
+**Skeletons it refuses to touch.** Judging a weight means deciding which bone
+a vertex belongs to, which needs bones that say what they are. The original
+(non-`_rig`) `frogger`, `nullbot` and `saurion` skeletons are ~65%
+`bone_17` / `tripo0_Left_Limb_3`, so an arm cannot be told from a backpack
+there; the pass bails out above 25% unnamed bones. Their `_rig` re-exports are
+clean Rigify and are fully repaired — and those are the default.
+
+**Result.** Dragged body vertices go to 0 on all 13 human models and all 7
+`_rig` mechs, worst-case body displacement under 0.01 H, while arm motion is
+unchanged (e.g. duelist 0.1980 → 0.1976, megumi identical). Cost is 7-100 ms
+per model on top of a 100-460 ms load, on the background warm path.
+Residual, deliberately: titanus's shoulder-mounted missile stacks ride
+`shoulderR/L` (they sit *on* the shoulder — geometrically ambiguous, and not a
+waist/leg case), and the three unnamed skeletons above.
+
+**Check new models with `/skinaudit.html`** (`src/characters/skinAudit.ts`):
+`__skinAudit(url)` vs `__skinAudit(url, {fix:true})` — `dragged` should reach 0
+and `armMotion.mean` should barely move; `__skinProbe(url)` explains why a
+weight is suspect; `__skinShot(url)` renders raw | repaired side by side.
 
 ## Model findings (important)
 - Node names are sanitized by three's GLTFLoader: `DEF-spine.001` → `DEF-spine001`, `DEF-hand.R` → `DEF-handR`.

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { fixArmSkinningIn } from './skinFix';
 import type { CharacterDef } from '../core/types';
 
 /* ============================================================
@@ -56,6 +57,11 @@ export async function loadModel(
 
   const scene = gltf.scene;
   scene.updateMatrixWorld(true);
+
+  // Tripo's auto-skinning binds with the arms at the sides, so a slice of
+  // thigh / skirt / shin geometry ends up owned by the hand and elbow bones
+  // and rides along with every swing. Trim those weights back onto the body.
+  fixArmSkinningIn(scene);
 
   // ---- measure raw bounds (rest pose == bind pose, so geometry bbox is valid) ----
   const bbox = new THREE.Box3().setFromObject(scene);
