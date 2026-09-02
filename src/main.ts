@@ -6,6 +6,7 @@ import { InputManager } from './core/input';
 import { createAudio } from './audio';
 import { createUI, type UiApi } from './ui';
 import { createStadium, themeDefs } from './world/stadium';
+import { getPalette } from './world/themes';
 import { loadAvatar } from './characters';
 import { MatchController } from './match/match';
 import { MatchCamera } from './match/camera';
@@ -357,6 +358,9 @@ async function startMatch(theme: CourtThemeDef, gamesToWin: 1 | 2 | 4, splitHuma
     const avatars = await Promise.race([job.promise, watchdogFired]);
 
     prefetch = null; // these instances are now owned by the match
+    // dark courts need the characters lifted more than bright ones do
+    const lift = getPalette(theme.id).charLift;
+    for (const a of avatars) a.setAmbient(lift);
     ui.setLoadingProgress(1, 'READY!');
 
     match = new MatchController(setup, avatars, theme, { audio, ui, input, stadium });

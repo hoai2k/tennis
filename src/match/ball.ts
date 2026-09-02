@@ -163,11 +163,7 @@ export class Ball {
     // ground bounce
     if (this.pos.y < BALL.radius && this.vel.y < 0) {
       this.pos.y = BALL.radius;
-      this.vel.y = -this.vel.y * BALL.bounceRestitution * this.bounceRestitutionMul;
-      // spin effects on bounce
-      if (this.spin.y > 0.5) { this.vel.z *= 1.12; this.vel.y *= 0.9; }   // topspin kicks forward, stays low-ish
-      else if (this.spin.y < -0.4) { this.vel.z *= 0.82; this.vel.y *= 0.75; } // slice skids & dies
-      this.vel.x *= 0.92; this.vel.z *= 0.96;
+      this.applyBounce(this.vel);
       this.bouncesSinceHit++;
       const side = Math.sign(this.pos.z);
       if (side !== this.sideOfLastBounce) this.sideOfLastBounce = side;
@@ -206,6 +202,23 @@ export class Ball {
     this.trail.instanceMatrix.needsUpdate = true;
   }
 
+  /** The one and only bounce impulse. The live step and both predictors share
+   *  it, so the swing gate can never disagree with what the ball does. */
+  private applyBounce(v: THREE.Vector3): void {
+    // Mario Tennis: topspin bounces HIGH, slice bounces low. Ours did the
+    // opposite for topspin (z *= 1.12, y *= 0.9 — forward and flat), which was
+    // the single biggest reason deep balls could not be chased down.
+    const spinLift = this.spin.y > 0.5 ? 1.06 : this.spin.y < -0.4 ? 0.75 : 1;
+    const e = Math.min(
+      BALL.maxRestitution,
+      BALL.bounceRestitution * this.bounceRestitutionMul * spinLift,
+    );
+    v.y = -v.y * e;
+    if (this.spin.y < -0.4) v.z *= 0.82;                   // slice skids
+    v.x *= BALL.bounceFriction;
+    v.z *= BALL.bounceFriction;
+  }
+
   /**
    * Positions at `count` evenly spaced times up to `horizon` seconds ahead,
    * bounces included — one forward pass shared by every reach test.
@@ -224,10 +237,7 @@ export class Ball {
       p.addScaledVector(v, h);
       if (p.y < BALL.radius && v.y < 0) {
         p.y = BALL.radius;
-        v.y = -v.y * BALL.bounceRestitution * this.bounceRestitutionMul;
-        if (this.spin.y > 0.5) { v.z *= 1.12; v.y *= 0.9; }
-        else if (this.spin.y < -0.4) { v.z *= 0.82; v.y *= 0.75; }
-        v.x *= 0.92; v.z *= 0.96;
+        this.applyBounce(v);
       }
       if (t + h >= next) { out[idx++].copy(p); next += step; }
     }
@@ -247,10 +257,7 @@ export class Ball {
       p.addScaledVector(v, h);
       if (p.y < BALL.radius && v.y < 0) {
         p.y = BALL.radius;
-        v.y = -v.y * BALL.bounceRestitution * this.bounceRestitutionMul;
-        if (this.spin.y > 0.5) { v.z *= 1.12; v.y *= 0.9; }
-        else if (this.spin.y < -0.4) { v.z *= 0.82; v.y *= 0.75; }
-        v.x *= 0.92; v.z *= 0.96;
+        this.applyBounce(v);
       }
     }
     return out.copy(p);

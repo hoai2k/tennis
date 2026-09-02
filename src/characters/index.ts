@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Avatar, CharacterDef, SwingOpts, SwingSide } from '../core/types';
-import { loadModel } from './loader';
+import { AMBIENT_LIFT, WHITE, loadModel } from './loader';
 import { Rig } from './rig';
 import { Animator } from './animator';
 import { ClipAvatar } from './clipAvatar';
@@ -34,6 +34,8 @@ class AvatarImpl implements Avatar {
   private glowTarget = 0;
   private glowCurrent = 0;
   private glowColor: THREE.Color;
+  private emissiveTmp = new THREE.Color();
+  private ambient = AMBIENT_LIFT;
   private disposed = false;
 
   constructor(def: CharacterDef, root: THREE.Group, container: THREE.Group, meshes: THREE.Mesh[], materials: THREE.MeshStandardMaterial[]) {
@@ -43,10 +45,15 @@ class AvatarImpl implements Avatar {
     this.materials = materials;
     this.glowColor = new THREE.Color(def.color);
 
-    // prep glow (materials are per-avatar already — each load parses its own GLB)
+    // Prep glow (materials are per-avatar already — each load parses its own
+    // GLB). The same channel carries a constant AMBIENT_LIFT so the character
+    // keeps a floor of brightness on the dark courts; the star glow rides on
+    // top of it. emissiveMap = the diffuse map means the lift follows the
+    // texture and reads as light on the character, not paint over it.
     for (const m of materials) {
-      m.emissive.copy(this.glowColor);
-      m.emissiveIntensity = 0;
+      m.emissiveMap = m.map ?? null;
+      m.emissive.copy(WHITE);
+      m.emissiveIntensity = this.ambient;
     }
 
     this.rig = new Rig(root, container);
@@ -80,7 +87,11 @@ class AvatarImpl implements Avatar {
     const k = 1 - Math.exp(-12 * Math.min(dt, 0.1));
     this.glowCurrent += (this.glowTarget - this.glowCurrent) * k;
     if (Math.abs(this.glowCurrent - this.glowTarget) < 0.005) this.glowCurrent = this.glowTarget;
-    for (const m of this.materials) m.emissiveIntensity = this.glowCurrent * 0.9;
+    const tint = this.emissiveTmp.copy(WHITE).lerp(this.glowColor, Math.min(1, this.glowCurrent * 2));
+    for (const m of this.materials) {
+      m.emissive.copy(tint);
+      m.emissiveIntensity = this.ambient + this.glowCurrent * 0.9;
+    }
   }
 
   setMovement(speed: number, dirX: number, dirZ: number): void {
@@ -133,6 +144,10 @@ class AvatarImpl implements Avatar {
     this.animator.playReady();
   }
 
+  setAmbient(level: number): void {
+    this.ambient = Math.max(0, level);
+  }
+
   setGlow(intensity: number): void {
     this.glowTarget = THREE.MathUtils.clamp(intensity, 0, 2);
   }
@@ -176,9 +191,11 @@ class AvatarImpl implements Avatar {
       if (skinned.isSkinnedMesh && skinned.skeleton) skinned.skeleton.dispose();
     }
     for (const m of this.materials) {
+      // emissiveMap aliases map (the ambient lift reuses it) — dispose once
+      const seen = new Set<THREE.Texture>();
       for (const key of ['map', 'normalMap', 'metalnessMap', 'roughnessMap', 'aoMap', 'emissiveMap'] as const) {
         const tex = m[key];
-        if (tex) tex.dispose();
+        if (tex && !seen.has(tex)) { seen.add(tex); tex.dispose(); }
       }
       m.dispose();
     }

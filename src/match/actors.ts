@@ -16,6 +16,16 @@ export interface ActorIntent {
 }
 
 const COMBO_WINDOW = 0.24;
+/** After the shot button is released the wind-up stays live this long, still
+ *  looking for the ball, before it resolves into a swing at empty air.
+ *
+ *  This is Mario Tennis's model: there, holding a shot button makes the
+ *  character hit the ball automatically as soon as it is in reach, and a tap
+ *  is enough to arm the shot — you are never punished for letting go early.
+ *  Without the grace, releasing resolved the wind-up on the release frame and
+ *  locked the player out for 0.42s, which is longer than a fast ball takes to
+ *  arrive: every tapped volley died there. */
+export const RELEASE_GRACE = 0.35;
 /** sprint tuning: a sustained boost you steer, not a fixed-length dash */
 const SPRINT_SPEED_MUL = 1.78;
 /** full bar lasts this long at a flat sprint (seconds) */
@@ -39,6 +49,8 @@ export class Actor {
   /** button that opened the current wind-up (for release detection) */
   get chargeBtn(): 'a' | 'b' | 'x' | 'y' | '' { return this.firstBtn; }
   swingLock = 0; // seconds until able to act after a swing
+  /** >0 while a released wind-up is still hoping to connect (see RELEASE_GRACE) */
+  releaseGrace = 0;
   intent: ActorIntent = { moveX: 0, moveZ: 0, shotPressed: '', aimX: 0, aimY: 0 };
   readonly maxSpeed: number;
   readonly reach: number;
@@ -117,6 +129,7 @@ export class Actor {
   }
 
   cancelCharge(): void {
+    this.releaseGrace = 0;
     if (!this.charging) return;
     this.charging = false;
     this.chargeTime = 0;
@@ -149,7 +162,9 @@ export class Actor {
     if (this.swingLock > 0) this.swingLock -= dt;
 
     if (this.charging) {
-      this.chargeTime += dt;
+      // power only banks while the button is actually down — the grace window
+      // keeps the swing alive for contact, it is not free charge
+      if (this.releaseGrace <= 0) this.chargeTime += dt;
       if (this.comboT > 0) this.comboT -= dt;
     }
 

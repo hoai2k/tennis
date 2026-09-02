@@ -22,6 +22,15 @@ function getLoader(): GLTFLoader {
   return loader;
 }
 
+/** Constant self-lift carried on the emissive channel, modulated by the
+ *  diffuse map so it reads as light falling on the character rather than
+ *  paint over them. Gives every fighter a floor of brightness so they stay
+ *  readable on the dark courts; the star glow rides on top in the same
+ *  channel. */
+export const AMBIENT_LIFT = 0.13;
+/** neutral tint the lift uses at rest (the glow lerps away from it) */
+export const WHITE = new THREE.Color(0xffffff);
+
 export interface LoadedModel {
   /** identity-transform root; game owns its position/rotation.y */
   root: THREE.Group;
@@ -83,9 +92,13 @@ export async function loadModel(
       for (const m of mats) {
         const std = m as THREE.MeshStandardMaterial;
         if (std.isMeshStandardMaterial) {
-          // Tripo PBR often reads flat/dark — brighten & de-metal a touch
-          std.metalness = Math.min(std.metalness, 0.35);
-          std.roughness = Math.min(1, Math.max(0.45, std.roughness));
+          // Tripo PBR reads flat and dark under game lighting. There is no
+          // environment map in the scene, so metalness has nothing to reflect
+          // — every bit of it just removes diffuse response and throws the
+          // light away. Keep it near zero and cap roughness so the characters
+          // actually take the light on the darker courts.
+          std.metalness = Math.min(std.metalness, 0.06);
+          std.roughness = THREE.MathUtils.clamp(std.roughness, 0.45, 0.8);
           std.envMapIntensity = 1;
           if (!materials.includes(std)) materials.push(std);
         }
