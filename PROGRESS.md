@@ -112,3 +112,16 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Fixed a self-inflicted regression found while enabling them: konga's and
       saurion's crouch flavors hung the racquet below the court at rest
       (-0.20m); stances now keep the crouch but leave the racquet arm free
+
+## Phase 11 — Camera & split-screen fixes
+- [x] Split view is now side-by-side (P1 left, P2 right) instead of
+      stacked; pane aspect, camera FOV, HUD divider and meters all follow
+- [x] Player 2's stick now maps through their OWN camera in split view —
+      the mirrored view flips screen-right/up, so raw world-space input was
+      reversed for them (movement, aim and serve direction all corrected)
+- [x] Camera pulled in closer: the safe-frame margins, not the base shot,
+      were setting the distance — loosened them (0.86/0.80 -> 0.95/0.88)
+      and trimmed headroom, bringing a rally shot from z~30 to z~20
+- [x] Verified: nobody cropped in doubles (worst NDC 0.21/0.58), full
+      singles match to victory, split view at 16:9 and 4:3, and the
+      shared-camera control mapping proven unchanged

@@ -145,12 +145,13 @@ export class Hud {
     this.announceLayer.innerHTML = '';
   }
 
-  /** in split view each player's meters live inside their own pane */
+  /** in split view each player's meters live inside their own pane
+   *  (team 0 = left pane, team 1 = right pane) */
   setSplitView(enabled: boolean, slotTeams: (0 | 1)[]): void {
     this.el.classList.toggle('cc-hud-split', enabled);
     this.chargeEls.forEach((c, i) => {
-      c.wrap.classList.toggle('cc-meter-top', enabled && slotTeams[i] === 0);
-      c.wrap.classList.toggle('cc-meter-bottom', enabled && slotTeams[i] === 1);
+      c.wrap.classList.toggle('cc-meter-left', enabled && slotTeams[i] === 0);
+      c.wrap.classList.toggle('cc-meter-right', enabled && slotTeams[i] === 1);
     });
   }
 

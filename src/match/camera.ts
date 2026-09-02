@@ -4,11 +4,23 @@ import { COURT } from '../core/constants';
 /* Mario Tennis style camera: elevated behind team 0's baseline, gently
  * tracking the ball laterally and pushing in/out with rally depth. */
 
-/** fraction of the frame treated as safe (NDC) before the camera retreats */
-const SAFE_X = 0.86;
-const SAFE_Y = 0.80;
+/** Fraction of the frame treated as safe (NDC) before the camera retreats.
+ *  These, not the base shot, are what actually set the camera distance in a
+ *  rally — the framing loop below retreats until the worst-placed player fits
+ *  inside them, so loosening them is what brings the shot in. Y stays tighter
+ *  than X to leave room for the scoreboard and the charge meters. */
+const SAFE_X = 0.95;
+const SAFE_Y = 0.88;
+/** headroom above a character's origin that must stay in frame (metres) */
+const HEAD_ROOM = 1.3;
 /** never retreat further than this beyond the base framing (metres) */
-const MAX_PULLBACK = 13;
+const MAX_PULLBACK = 16;
+
+/** base shot: how far behind the baseline the camera sits, and how high.
+ *  Tight enough that the characters read at a glance — the framing logic
+ *  below retreats from here whenever someone would fall out of frame. */
+const BASE_BACK = 6.1;
+const BASE_HEIGHT = 7.6;
 
 export class MatchCamera {
   readonly camera: THREE.PerspectiveCamera;
@@ -25,7 +37,7 @@ export class MatchCamera {
   constructor(aspect: number, team: 0 | 1 = 0) {
     this.sign = team === 0 ? 1 : -1;
     this.camera = new THREE.PerspectiveCamera(48, aspect, 0.1, 400);
-    this.camera.position.set(0, 9.5, this.sign * (COURT.halfLength + 9));
+    this.camera.position.set(0, BASE_HEIGHT, this.sign * (COURT.halfLength + BASE_BACK));
     this.camera.lookAt(0, 0.5, this.sign * -4);
   }
 
@@ -34,11 +46,12 @@ export class MatchCamera {
     this.camera.updateProjectionMatrix();
   }
 
-  /** A split pane is short and wide: widening the aspect alone only adds
-   *  horizontal view, so open the vertical field too or the framing logic
-   *  retreats halfway out of the stadium to fit the court in. */
+  /** A side-by-side split pane is tall and narrow: halving the aspect costs
+   *  horizontal view, so open the vertical field to win it back — otherwise
+   *  the framing logic retreats halfway out of the stadium to fit the court
+   *  across the pane's width. */
   setSplit(on: boolean): void {
-    this.camera.fov = on ? 62 : 48;
+    this.camera.fov = on ? 64 : 48;
     this.camera.updateProjectionMatrix();
   }
 
@@ -67,8 +80,8 @@ export class MatchCamera {
 
     this.posTarget.set(
       bx * 0.35 * sg,
-      9.2 + Math.max(0, ballPos.y - 4) * 0.25,
-      sg * (COURT.halfLength + 8.6 + bz * sg * 0.1),
+      BASE_HEIGHT + Math.max(0, ballPos.y - 4) * 0.25,
+      sg * (COURT.halfLength + BASE_BACK + bz * sg * 0.1),
     );
 
     // --- keep everyone in shot ---
@@ -85,7 +98,7 @@ export class MatchCamera {
     let overflow = 1;
     for (const f of focus) {
       // include headroom so a character's head isn't clipped
-      this._pt.set(f.x, f.y + 2.1, f.z).project(probe);
+      this._pt.set(f.x, f.y + HEAD_ROOM, f.z).project(probe);
       overflow = Math.max(overflow, Math.abs(this._pt.x) / SAFE_X, Math.abs(this._pt.y) / SAFE_Y);
       this._pt.set(f.x, f.y, f.z).project(probe);
       overflow = Math.max(overflow, Math.abs(this._pt.x) / SAFE_X, Math.abs(this._pt.y) / SAFE_Y);

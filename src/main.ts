@@ -31,11 +31,11 @@ let splitView = false;
 function resize(): void {
   renderer.setSize(window.innerWidth, window.innerHeight);
   const full = window.innerWidth / window.innerHeight;
-  // each split pane is full width by half height
+  // split panes sit side by side: each is half width by full height
   matchCam.setSplit(splitView);
-  matchCam.resize(splitView ? full * 2 : full);
+  matchCam.resize(splitView ? full / 2 : full);
   rivalCam.setSplit(true);
-  rivalCam.resize(full * 2);
+  rivalCam.resize(full / 2);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -419,14 +419,14 @@ function renderFrame(): void {
     renderer.render(scene, matchCam.camera);
     return;
   }
-  const half = Math.floor(H / 2);
+  const half = Math.floor(W / 2);
   renderer.setScissorTest(true);
-  // team 0 on top, team 1 below (three's viewport origin is bottom-left)
-  renderer.setViewport(0, half, W, H - half);
-  renderer.setScissor(0, half, W, H - half);
+  // player 1 (team 0) left, player 2 (team 1) right
+  renderer.setViewport(0, 0, half, H);
+  renderer.setScissor(0, 0, half, H);
   renderer.render(scene, matchCam.camera);
-  renderer.setViewport(0, 0, W, half);
-  renderer.setScissor(0, 0, W, half);
+  renderer.setViewport(half, 0, W - half, H);
+  renderer.setScissor(half, 0, W - half, H);
   renderer.render(scene, rivalCam.camera);
   renderer.setScissorTest(false);
 }

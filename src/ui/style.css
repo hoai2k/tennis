@@ -1531,22 +1531,22 @@
 /* SPLIT VIEW — one pane per side when rivals share a screen          */
 /* ---------------------------------------------------------------- */
 
-/* hairline between the two panes */
+/* hairline between the two side-by-side panes */
 .cc-ui.cc-split::after {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 4px;
-  transform: translateY(-2px);
-  background: linear-gradient(90deg, rgba(255,212,42,0.15), var(--cc-yellow), rgba(255,212,42,0.15));
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 4px;
+  transform: translateX(-2px);
+  background: linear-gradient(180deg, rgba(255,212,42,0.15), var(--cc-yellow), rgba(255,212,42,0.15));
   box-shadow: 0 0 12px rgba(255, 212, 42, 0.5);
   pointer-events: none;
   z-index: 40;
 }
 /* meters sit inside their own pane rather than at the screen edges */
-.cc-hud-split .cc-charge.cc-meter-top { bottom: auto; top: calc(50% - 118px); }
-.cc-hud-split .cc-charge.cc-meter-bottom { bottom: 84px; }
-/* announcements read on both halves, so keep them off the divider */
-.cc-hud-split .cc-announce-layer { align-items: flex-start; padding-top: 12vh; }
+.cc-hud-split .cc-charge.cc-meter-left { left: 50%; right: auto; transform: translateX(-50%) translateX(-25vw); }
+.cc-hud-split .cc-charge.cc-meter-right { left: 50%; right: auto; transform: translateX(-50%) translateX(25vw); }
+/* announcements are centred over the divider, so lift them clear of play */
+.cc-hud-split .cc-announce-layer { align-items: flex-start; padding-top: 10vh; }

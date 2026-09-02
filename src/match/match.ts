@@ -64,6 +64,8 @@ export class MatchController {
   private phase: Phase = 'intro';
   private phaseT = 0;
   private singles: boolean;
+  /** humans on both teams ⇒ two panes, each with its own camera */
+  private splitView = false;
   private lastHitTeam: 0 | 1 | -1 = -1;
   private rallyHits = 0;
   private pending: PendingHit | null = null;
@@ -110,6 +112,9 @@ export class MatchController {
       onNetCord: () => this.handleNetCord(),
       onDead: () => this.handleDead(),
     };
+
+    // fixed for the life of the match: drives per-pane input orientation
+    this.splitView = this.needsSplitView;
 
     this.phase = 'intro';
     this.phaseT = 0;
@@ -635,8 +640,9 @@ export class MatchController {
     if (!this.tossActive) {
       // the server may walk the baseline to pick their spot before tossing
       if (isHuman && this.server.pad) {
-        this.server.intent.moveX = this.server.pad.moveX;
-        this.server.intent.moveZ = this.server.pad.moveY * 0.65;
+        const vs = this.viewSign(this.server);
+        this.server.intent.moveX = this.server.pad.moveX * vs;
+        this.server.intent.moveZ = this.server.pad.moveY * 0.65 * vs;
       } else {
         this.server.intent.moveX = 0;
         this.server.intent.moveZ = 0;
@@ -665,7 +671,9 @@ export class MatchController {
         return;
       }
       if (isHuman) {
-        if (this.server.pad?.pressed('a')) this.doServeHit(this.server.pad.moveX);
+        if (this.server.pad?.pressed('a')) {
+          this.doServeHit(this.server.pad.moveX * this.viewSign(this.server));
+        }
       } else {
         const brain = this.brains.get(this.server)!;
         if (brain.serveTick(dt, this.tossT, true) === 'hit') this.doServeHit(brain.serveAimX);
@@ -698,7 +706,11 @@ export class MatchController {
     for (const a of this.actors) {
       if (a === this.server) continue;
       a.intent.moveX = 0; a.intent.moveZ = 0;
-      if (a.isHuman && a.pad) { a.intent.moveX = a.pad.moveX * 0.4; a.intent.moveZ = a.pad.moveY * 0.4; }
+      if (a.isHuman && a.pad) {
+        const vs = this.viewSign(a);
+        a.intent.moveX = a.pad.moveX * 0.4 * vs;
+        a.intent.moveZ = a.pad.moveY * 0.4 * vs;
+      }
     }
   }
 
@@ -744,10 +756,14 @@ export class MatchController {
     for (const a of this.actors) {
       if (!a.isHuman || !a.pad) continue;
       if (this.phase === 'rally' || this.phase === 'serveFlight') {
-        a.intent.moveX = a.pad.moveX;
-        a.intent.moveZ = a.pad.moveY;
-        a.intent.aimX = a.pad.moveX;
-        a.intent.aimY = -a.pad.moveY * (a.team === 0 ? 1 : -1); // push toward far side = deeper
+        // stick in the player's own view frame, then into world space
+        const vs = this.viewSign(a);
+        const px = a.pad.moveX * vs;
+        const py = a.pad.moveY * vs;
+        a.intent.moveX = px;
+        a.intent.moveZ = py;
+        a.intent.aimX = px;
+        a.intent.aimY = -py * (a.team === 0 ? 1 : -1); // push toward far side = deeper
       }
       // Only drop a wind-up the player is no longer holding; while the button
       // is down the coiled pose is exactly the feedback they asked for.
@@ -825,6 +841,17 @@ export class MatchController {
     const t0 = this.teamActors(0).some((a) => a.isHuman);
     const t1 = this.teamActors(1).some((a) => a.isHuman);
     return t0 && t1;
+  }
+
+  /**
+   * Stick → world mapping for one actor, as seen through the camera THEY are
+   * looking at. Everyone shares the team-0 camera normally, so raw stick input
+   * is already world-space. In split view team 1 gets its own camera behind
+   * the far baseline: that view is rotated 180°, so screen-right is world -x
+   * and screen-up is world +z, and their stick has to be flipped to match.
+   */
+  private viewSign(a: Actor): 1 | -1 {
+    return this.splitView && a.team === 1 ? -1 : 1;
   }
 
   /** which team each slot plays for (drives per-half HUD placement) */
