@@ -103,6 +103,9 @@ export interface Avatar {
 
   /** tint/highlight for star shot etc. */
   setGlow(intensity: number): void;
+  /** constant self-lift 0..1 so the character stays readable on a dark court;
+   *  the glow rides on top of it. Set per court theme when a match starts. */
+  setAmbient(level: number): void;
 
   dispose(): void;
 }

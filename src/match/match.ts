@@ -10,7 +10,7 @@ import type { InputManager } from '../core/input';
 import { Ball } from './ball';
 import { MatchFx } from './effects';
 import { Scorer } from './rules';
-import { Actor } from './actors';
+import { Actor, RELEASE_GRACE } from './actors';
 import { AiBrain } from './ai';
 import { SHOT_PROFILES, computeTarget, solveShot } from './shots';
 
@@ -39,6 +39,20 @@ const STAR_HORIZON = 2.2;
 const STAR_SAMPLES = 30;
 /** how close you must be to the star to trigger a star shot (metres) */
 const STAR_HIT_RADIUS = 1.6;
+
+/** distance from the net that counts as net play. Inside it a swing is a
+ *  volley: struck out in front, with no time to reposition or wait. */
+const VOLLEY_ZONE = 5.2;
+/** reach bonus while volleying — a volley is a punch, not a full stroke you
+ *  have to line up, so the band you cover at the net is wider */
+const VOLLEY_REACH_MUL = 1.15;
+/** contact height at which a topspin/flat becomes an overhead smash. Chest
+ *  height at the net is a volley; measured net contacts cluster at 1.5-1.6m,
+ *  so the old 1.5 threshold turned about half of them into overheads. */
+const SMASH_HEIGHT = 1.9;
+/** recovery after a swing; net exchanges are far too quick for the full one */
+const SWING_RECOVERY = 0.55;
+const VOLLEY_RECOVERY = 0.34;
 
 /** look-ahead used to decide when to swing (seconds) */
 const REACH_HORIZON = 0.5;
@@ -445,13 +459,19 @@ export class MatchController {
 
     // Mario Tennis lets you stretch, dive and leap for balls outside your
     // standing reach — the shot just comes off weaker.
-    const stand = actor.reachStand;
-    const ext = actor.reachExtended;
+    const volleying = Math.abs(actor.pos.z) < VOLLEY_ZONE && Math.abs(contact.z) < VOLLEY_ZONE;
+    const reachMul = volleying ? VOLLEY_REACH_MUL : 1;
+    const stand = actor.reachStand * reachMul;
+    const ext = actor.reachExtended * reachMul;
     if (dHoriz > ext) return;
     if (contact.y > STAND_HIT_HEIGHT + LEAP_EXTRA_HEIGHT || contact.y < 0) return;
-    // Still closing and it will come inside a comfortable reach? Hold the
-    // wind-up — swinging now would only produce a stretched, weak contact.
-    if (dHoriz > stand && dLater < dHoriz) return;
+    // Out of comfortable reach, but it will come inside it? Hold the wind-up
+    // — swinging now would only produce a stretched, weak contact. Waiting for
+    // any improvement (the old rule) meant waiting for the ball's closest
+    // approach, which is level with the body: fine from the baseline, but at
+    // the net it turned every volley into a cramped late one. Wait only when
+    // waiting actually buys a clean strike.
+    if (dHoriz > stand && dLater < stand) return;
     const needLeap = contact.y > STAND_HIT_HEIGHT;
     const needLunge = dHoriz > stand;
 
@@ -475,7 +495,7 @@ export class MatchController {
       star = true;
       this.fx.hideStar();
       this.starConsumedBy = actor;
-    } else if (contact.y > 1.5 && (kind === 'flat' || kind === 'topspin')) {
+    } else if (contact.y > SMASH_HEIGHT && (kind === 'flat' || kind === 'topspin')) {
       kind = 'smash';
     }
 
@@ -483,7 +503,7 @@ export class MatchController {
     const aimY = actor.intent.aimY;
     const charge = actor.charge;
     const side = actor.sideForBallX(contact.x);
-    const overhead = contact.y > 1.4 && (kind === 'smash' || kind === 'star' || needLeap);
+    const overhead = contact.y > 1.6 && (kind === 'smash' || kind === 'star' || needLeap);
     const swingSide: SwingSide = overhead ? 'overhead' : side;
 
     // ---- contact magnet (the Mario Tennis "tight action") ----
@@ -516,7 +536,7 @@ export class MatchController {
     actor.avatar.swing({ side: swingSide, kind, power: charge, contactHeight: contact.y });
     actor.avatar.setGlow(0);
     actor.cancelCharge();
-    actor.swingLock = 0.55;
+    actor.swingLock = volleying ? VOLLEY_RECOVERY : SWING_RECOVERY;
     this.deps.audio.chargeLoop(false);
 
     // off-balance shots are weaker and less precise
@@ -797,7 +817,7 @@ export class MatchController {
         });
       }
     }
-    this.processShotInputs();
+    this.processShotInputs(dt);
   }
 
   private driveIntents(dt: number): void {
@@ -816,7 +836,7 @@ export class MatchController {
       }
       // Only drop a wind-up the player is no longer holding; while the button
       // is down the coiled pose is exactly the feedback they asked for.
-      if (a.charging && a.chargeBtn && !a.pad.held(a.chargeBtn)) {
+      if (a.charging && a.chargeBtn && !a.pad.held(a.chargeBtn) && a.releaseGrace <= 0) {
         a.cancelCharge();
         a.avatar.setGlow(0);
         this.deps.audio.chargeLoop(false);
@@ -871,7 +891,7 @@ export class MatchController {
     }
   }
 
-  private processShotInputs(): void {
+  private processShotInputs(dt: number): void {
     if (this.phase !== 'rally' && this.phase !== 'serveFlight') return;
     for (const a of this.actors) {
       let btn: 'a' | 'b' | 'x' | 'y' | '' = '';
@@ -885,7 +905,7 @@ export class MatchController {
         a.intent.shotPressed = '';
       }
       if (btn) {
-        if (a.charging) a.comboPress(btn);
+        if (a.charging) { a.releaseGrace = 0; a.comboPress(btn); }
         // A human who presses gets a wind-up immediately, even if the ball is
         // still on the far side — pressing and seeing nothing happen is the
         // single most confusing thing the controls can do. The swing simply
@@ -899,10 +919,18 @@ export class MatchController {
       if (a.charging || btn) this.tryExecuteHit(a);
       else if (this.lastHitTeam !== a.team) this.tryAutoSwing(a);
 
-      // Releasing the button always resolves the wind-up: if the ball never
-      // came, swing through anyway rather than freezing in the coiled pose.
+      // Releasing the button resolves the wind-up — but not on the release
+      // frame. A tap aimed at a ball a tenth of a second away used to whiff
+      // and then lock the player out for 0.42s, which is longer than the ball
+      // takes to arrive: every volley died there. Keep the swing intent alive
+      // for a beat and let tryExecuteHit claim it; only swing through empty
+      // air once the beat has passed.
       if (a.isHuman && a.pad && a.charging && a.chargeBtn && a.pad.released(a.chargeBtn)) {
-        this.whiffSwing(a);
+        a.releaseGrace = RELEASE_GRACE;
+      }
+      if (a.charging && a.releaseGrace > 0) {
+        a.releaseGrace -= dt;
+        if (a.releaseGrace <= 0) this.whiffSwing(a);
       }
     }
   }

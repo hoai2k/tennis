@@ -53,6 +53,13 @@ export interface ThemePalette {
   dirColor: number;
   dirInt: number;
   dirPos: [number, number, number];
+  /** character fill: two near-horizontal lights that lift the players off a
+   *  dark court without washing the court itself out (see lights.ts) */
+  fillColor: number;
+  fillInt: number;
+  /** self-lift carried on the characters' emissive channel — dark courts need
+   *  more of it, bright ones would wash the costumes out (see characters/) */
+  charLift: number;
   floodlights: boolean;
 }
 
@@ -110,6 +117,9 @@ const PALETTES: Record<CourtTheme, ThemePalette> = {
     dirColor: 0xfff3d8,
     dirInt: 2.1,
     dirPos: [18, 30, 14],
+    fillColor: 0xffe9d0,
+    fillInt: 0.45,
+    charLift: 0.05,
     floodlights: false,
   },
   nevarro: {
@@ -145,6 +155,9 @@ const PALETTES: Record<CourtTheme, ThemePalette> = {
     dirColor: 0xffc178,
     dirInt: 1.9,
     dirPos: [-16, 20, -26],
+    fillColor: 0xffd9b0,
+    fillInt: 0.55,
+    charLift: 0.06,
     floodlights: false,
   },
   night: {
@@ -180,6 +193,9 @@ const PALETTES: Record<CourtTheme, ThemePalette> = {
     dirColor: 0xbfd0ff,
     dirInt: 1.1,
     dirPos: [10, 34, 12],
+    fillColor: 0xd8dcff,
+    fillInt: 1.15,
+    charLift: 0.13,
     floodlights: true,
   },
   jujutsuhigh: {
@@ -216,6 +232,9 @@ const PALETTES: Record<CourtTheme, ThemePalette> = {
     dirColor: 0xfff3d8,
     dirInt: 2.0,
     dirPos: [14, 28, 10],
+    fillColor: 0xfff0d8,
+    fillInt: 0.45,
+    charLift: 0.05,
     floodlights: false,
   },
   dune: {
@@ -255,6 +274,9 @@ const PALETTES: Record<CourtTheme, ThemePalette> = {
     dirColor: 0xffe9b8,
     dirInt: 2.2,
     dirPos: [20, 26, -8],
+    fillColor: 0xffeccf,
+    fillInt: 0.45,
+    charLift: 0.05,
     floodlights: false,
   },
   mandalore: {
@@ -291,6 +313,9 @@ const PALETTES: Record<CourtTheme, ThemePalette> = {
     dirColor: 0xd8f2e0,
     dirInt: 1.7,
     dirPos: [-14, 24, -20],
+    fillColor: 0xdff2ea,
+    fillInt: 0.7,
+    charLift: 0.08,
     floodlights: false,
   },
   foundry: {
@@ -327,6 +352,9 @@ const PALETTES: Record<CourtTheme, ThemePalette> = {
     dirColor: 0xffb878,
     dirInt: 1.8,
     dirPos: [-12, 22, -18],
+    fillColor: 0xffd8b8,
+    fillInt: 0.9,
+    charLift: 0.12,
     floodlights: false,
   },
   circuit: {
@@ -363,6 +391,9 @@ const PALETTES: Record<CourtTheme, ThemePalette> = {
     dirColor: 0xbfe8ff,
     dirInt: 1.1,
     dirPos: [-10, 32, 14],
+    fillColor: 0xcfe8ff,
+    fillInt: 1.2,
+    charLift: 0.14,
     floodlights: true,
   },
 };

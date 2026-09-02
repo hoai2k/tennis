@@ -147,3 +147,34 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Measured 8/8 legal serves per button with a clean depth spread:
       X 2.1m (33% of the box), B 3.7m (58%), A 4.2m (66%), Y 5.0m (78%)
 - [x] Controls screen documents the serve buttons
+
+## Phase 14 — Readability, chase window, net play
+- [x] Characters lit properly on the dark courts: Tripo PBR came in at
+      metalness 0.35 with no environment map in the scene, so a third of the
+      diffuse response was being thrown away — dropped to 0.06 and capped
+      roughness at 0.8. Plus a per-theme self-lift on the emissive channel
+      (`ThemePalette.charLift`, 0.05 bright courts → 0.14 Neon Circuit) that
+      the star glow now rides on top of, and two near-horizontal fill lights
+      that graze the deck at ~cos(83°) so they lift upright bodies, not the
+      court (`ThemePalette.fillColor/fillInt`)
+- [x] Chase window: the bounce was ACCELERATING topspin balls away from the
+      chaser (z *= 1.12) and flattening them (y *= 0.9) — the opposite of
+      Mario Tennis, where topspin bounces high. Now topspin sits up (a capped
+      1.06 lift) and every bounce sheds 15% of horizontal pace. Measured over
+      real rallies: hang time after the first bounce 0.55-0.69s → 0.73-0.87s,
+      and the share of the ball's post-bounce travel a sprint can cover went
+      from 59-70% to 74-88%
+- [x] One shared `Ball.applyBounce()` — the live step and both predictors used
+      to carry three hand-copied versions of the bounce maths
+- [x] Volleys: releasing the shot button resolved the wind-up on the release
+      frame and locked the player out for 0.42s, longer than a fast ball takes
+      to arrive, so every tapped volley whiffed. Added Mario Tennis's model —
+      a 0.35s RELEASE_GRACE during which the wind-up still looks for the ball
+      (power stops banking, so holding still means something). Tapped volleys
+      12/12 vs 8/12 before
+- [x] Swing gate waits only when waiting buys a clean strike (was: waiting for
+      the ball's closest approach, i.e. level with the body — fine at the
+      baseline, cramped at the net)
+- [x] Net play: +15% reach and 0.34s recovery inside 5.2m of the net; smash
+      conversion raised 1.5m → 1.9m, since measured net contacts cluster at
+      1.5-1.6m and half of them were turning into overheads

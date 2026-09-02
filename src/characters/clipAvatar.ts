@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { Avatar, CharacterDef, SwingOpts, SwingSide } from '../core/types';
 import { SWING_CONTACT_DELAY } from '../core/types';
-import type { LoadedModel } from './loader';
+import { AMBIENT_LIFT, WHITE, type LoadedModel } from './loader';
 import { buildRacquet, type Racquet } from './racquet';
 
 /* ============================================================
@@ -97,18 +97,22 @@ export class ClipAvatar implements Avatar {
   private meshes: THREE.Mesh[];
   private glowTarget = 0;
   private glowCurrent = 0;
+  private glowColor: THREE.Color;
+  private emissiveTmp = new THREE.Color();
+  private ambient = AMBIENT_LIFT;
   private disposed = false;
 
   constructor(def: CharacterDef, loaded: LoadedModel) {
     this.def = def;
+    this.glowColor = new THREE.Color(def.color);
     this.root = loaded.root;
     this.meshes = loaded.meshes;
     this.materials = loaded.materials;
 
-    const glowColor = new THREE.Color(def.color);
     for (const m of this.materials) {
-      m.emissive.copy(glowColor);
-      m.emissiveIntensity = 0;
+      m.emissiveMap = m.map ?? null;
+      m.emissive.copy(WHITE);
+      m.emissiveIntensity = this.ambient;
     }
 
     for (const clip of loaded.gltf.animations) this.clips.set(clip.name, clip);
@@ -286,7 +290,11 @@ export class ClipAvatar implements Avatar {
     const k = 1 - Math.exp(-12 * Math.min(dt, 0.1));
     this.glowCurrent += (this.glowTarget - this.glowCurrent) * k;
     if (Math.abs(this.glowCurrent - this.glowTarget) < 0.005) this.glowCurrent = this.glowTarget;
-    for (const m of this.materials) m.emissiveIntensity = this.glowCurrent * 0.9;
+    const tint = this.emissiveTmp.copy(WHITE).lerp(this.glowColor, Math.min(1, this.glowCurrent * 2));
+    for (const m of this.materials) {
+      m.emissive.copy(tint);
+      m.emissiveIntensity = this.ambient + this.glowCurrent * 0.9;
+    }
   }
 
   setMovement(speed: number, _dirX: number, _dirZ: number): void {
@@ -359,6 +367,10 @@ export class ClipAvatar implements Avatar {
     this.playBase('idle');
   }
 
+  setAmbient(level: number): void {
+    this.ambient = Math.max(0, level);
+  }
+
   setGlow(intensity: number): void {
     this.glowTarget = THREE.MathUtils.clamp(intensity, 0, 2);
   }
@@ -375,9 +387,11 @@ export class ClipAvatar implements Avatar {
       if (skinned.isSkinnedMesh && skinned.skeleton) skinned.skeleton.dispose();
     }
     for (const m of this.materials) {
+      // emissiveMap aliases map (the ambient lift reuses it) — dispose once
+      const seen = new Set<THREE.Texture>();
       for (const key of ['map', 'normalMap', 'metalnessMap', 'roughnessMap', 'aoMap', 'emissiveMap'] as const) {
         const tex = m[key];
-        if (tex) tex.dispose();
+        if (tex && !seen.has(tex)) { seen.add(tex); tex.dispose(); }
       }
       m.dispose();
     }

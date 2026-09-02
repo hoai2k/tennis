@@ -4,7 +4,18 @@ import type { ThemePalette } from './themes';
 
 /* Lighting rig: hemisphere + shadow-casting directional fit tightly around
  * the court. Night theme adds 4 floodlight towers with emissive heads and
- * (non-shadow) spotlights, plus a soft purple accent glow. */
+ * (non-shadow) spotlights, plus a soft purple accent glow.
+ *
+ * On top of that sit two CHARACTER FILL lights. three.js has no per-object
+ * light filtering (lights are only masked by camera layers), so the trick is
+ * geometric: aim them almost horizontally. A Lambert surface takes light by
+ * N·L, so a near-horizontal beam pours onto upright things — the players — and
+ * grazes the court floor at ~cos(83°), so it keeps only a ninth of the beam. That lifts the
+ * characters out of the dark courts without flattening the court itself. */
+
+/** elevation of the fill beams above the deck; low enough that the floor
+ *  keeps its contrast, high enough to reach faces rather than shins */
+const FILL_ELEVATION = 4.2;
 
 export function buildLights(palette: ThemePalette): THREE.Group {
   const group = new THREE.Group();
@@ -32,6 +43,16 @@ export function buildLights(palette: ThemePalette): THREE.Group {
   dir.target.position.set(0, 0, 0);
   group.add(dir);
   group.add(dir.target);
+
+  // --- character fill (see header): one from each baseline, no shadows ---
+  for (const end of [1, -1]) {
+    const fill = new THREE.DirectionalLight(palette.fillColor, palette.fillInt);
+    fill.position.set(end * 7, FILL_ELEVATION, end * 26);
+    fill.target.position.set(0, 1.1, 0);
+    fill.castShadow = false;
+    group.add(fill);
+    group.add(fill.target);
+  }
 
   if (palette.floodlights) {
     const poleMat = new THREE.MeshLambertMaterial({ color: 0x2a2450 });

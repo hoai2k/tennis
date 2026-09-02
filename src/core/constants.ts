@@ -25,7 +25,21 @@ export const GRAVITY = -22; // arcade-y gravity (real is -9.8; higher keeps rall
 
 export const BALL = {
   radius: 0.11, // slightly big, arcade look
-  bounceRestitution: 0.72,
+  /** Deliberately livelier than a real ball. The point ends on the second
+   *  bounce, so the hang time after the FIRST one is the whole window you get
+   *  to run a deep ball down — at 0.72 that window was ~0.66s while the ball
+   *  travelled 9-15m, i.e. it outran you. */
+  bounceRestitution: 0.80,
+  /** ceiling on the whole vertical rebound — court multiplier and topspin
+   *  lift included — so the bounciest surface (Mayhem Foundry, 1.18) plus a
+   *  topspin kick can't approach a perfectly elastic ball */
+  maxRestitution: 0.90,
+  /** Horizontal speed kept through a bounce. This — not the hang time — is
+   *  what decides whether you can run a ball down: chasing in the ball's own
+   *  direction, the ground you can cover is (sprint speed / post-bounce speed),
+   *  and the hang time cancels out. It used to be >1 for topspin, so the ball
+   *  literally accelerated away from you. */
+  bounceFriction: 0.85,
   airDrag: 0.008,
 } as const;
 
