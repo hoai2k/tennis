@@ -10,7 +10,7 @@ import type { InputManager } from '../core/input';
 import { Ball } from './ball';
 import { MatchFx } from './effects';
 import { Scorer } from './rules';
-import { Actor, RELEASE_GRACE } from './actors';
+import { Actor, RELEASE_GRACE, ANTICIPATION_POWER, ANTICIPATION_REACH } from './actors';
 import { AiBrain } from './ai';
 import { SHOT_PROFILES, computeTarget, solveShot } from './shots';
 
@@ -459,8 +459,15 @@ export class MatchController {
 
     // Mario Tennis lets you stretch, dive and leap for balls outside your
     // standing reach — the shot just comes off weaker.
+    // A volley at the net gets a wider chase window; independently of that,
+    // anticipation — the stick leaned toward the side the ball is really on,
+    // so the wind-up visibly came round before contact — buys a little extra
+    // range in that direction, and a little less if the lean was away from
+    // it. Small on purpose: reading the side is meant to be an edge, not a
+    // gate on rallying at all.
     const volleying = Math.abs(actor.pos.z) < VOLLEY_ZONE && Math.abs(contact.z) < VOLLEY_ZONE;
-    const reachMul = volleying ? VOLLEY_REACH_MUL : 1;
+    const antic = actor.anticipation(contact.x);
+    const reachMul = (volleying ? VOLLEY_REACH_MUL : 1) * (1 + antic * ANTICIPATION_REACH);
     const stand = actor.reachStand * reachMul;
     const ext = actor.reachExtended * reachMul;
     if (dHoriz > ext) return;
@@ -541,7 +548,8 @@ export class MatchController {
 
     // off-balance shots are weaker and less precise
     const stretchMul = needLunge ? (dHoriz > stand * 1.3 ? 0.76 : 0.87) : 1;
-    const power = actor.powerMul * (0.9 + charge * 0.32) * this.theme.ballSpeedMul * stretchMul;
+    const power = actor.powerMul * (0.9 + charge * 0.32) * this.theme.ballSpeedMul * stretchMul
+      * (1 + antic * ANTICIPATION_POWER);
     const aimJitter = needLunge ? (Math.random() - 0.5) * 0.22 : 0;
     this.pending = {
       t: SWING_CONTACT_DELAY, actor, kind,
@@ -623,6 +631,7 @@ export class MatchController {
     }
 
     this.excitement = Math.max(0.25, this.excitement - dt * 0.05);
+    this.updateLean();
 
     switch (this.phase) {
       case 'intro':
@@ -820,6 +829,20 @@ export class MatchController {
     this.processShotInputs(dt);
   }
 
+  /**
+   * Refresh every human's world-space stick lean before anything reads it
+   * this frame. Done here rather than in driveIntents because the phase
+   * switch — which is where shots are wound up and struck — runs first, and
+   * a frame-stale lean would score the anticipation against the previous
+   * position of the stick. AI actors keep leanX at 0 (see Actor.leanX).
+   */
+  private updateLean(): void {
+    for (const a of this.actors) {
+      if (!a.isHuman || !a.pad) continue;
+      a.leanX = a.pad.moveX * this.viewSign(a);
+    }
+  }
+
   private driveIntents(dt: number): void {
     // human stick → intent (screen-relative: up = away from camera = -z)
     for (const a of this.actors) {
@@ -876,11 +899,9 @@ export class MatchController {
         if (a.charging) a.comboPress(btn);
         else if (a.swingLock <= 0) {
           // no live ball to read a side from — let the stick pick, as the
-          // player would when lining a real shot up
-          // stick-right is the character's racquet side in EITHER pane, so
-          // the raw screen-relative stick is the right thing to read here
-          const side = a.pad.moveX < -0.3 ? 'back' : 'fore';
-          a.beginCharge(btn, side);
+          // player would when lining a real shot up (and as it does during a
+          // rally, where the lean also scores the anticipation bonus)
+          a.beginCharge(btn, a.sideForLeanX(a.leanX));
           this.deps.audio.chargeLoop(true);
         }
       }
@@ -911,7 +932,9 @@ export class MatchController {
         // single most confusing thing the controls can do. The swing simply
         // will not connect until the ball is theirs to hit.
         else if ((a.isHuman || this.lastHitTeam !== a.team) && a.swingLock <= 0) {
-          const side = a.sideForBallX(this.ball.pos.x);
+          // a committed stick calls the side; otherwise fall back to reading
+          // it off the ball, which is all the AI ever does (leanX stays 0)
+          const side = a.isLeaning ? a.sideForLeanX(a.leanX) : a.sideForBallX(this.ball.pos.x);
           a.beginCharge(btn, side);
           if (a.isHuman) this.deps.audio.chargeLoop(true);
         }

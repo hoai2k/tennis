@@ -178,3 +178,16 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Net play: +15% reach and 0.34s recovery inside 5.2m of the net; smash
       conversion raised 1.5m → 1.9m, since measured net contacts cluster at
       1.5-1.6m and half of them were turning into overheads
+
+## Phase 15 — Side anticipation
+- [x] The left stick now picks the swing side: lean right and the wind-up
+      comes round to the forehand, lean left and it goes to the backhand.
+      It re-steers every frame, so swapping the stick mid-charge visibly
+      swings the racquet across before contact
+- [x] Reading the side correctly (racquet already turned toward where the
+      ball really is) pays a small bonus; leaning away costs the same.
+      Measured: power 1.008 / 1.108 / 1.207 for a wrong / neutral / right
+      read (±9%), and max reach 2.97 / 3.19 / 3.41 m (±7%, i.e. ±0.22 m)
+- [x] The read ramps in over the stick's travel (nothing below 0.3, full
+      at 0.75) and stays at 0 for a ball hit straight at the player
+- [x] AI is untouched — it never sets a lean, so it scores neutral
