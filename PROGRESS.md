@@ -138,3 +138,12 @@ Status legend: [ ] todo · [~] in progress · [x] done
 - [x] Practice swings while idle: humans can wind up and swing between
       points (waiting on a serve, intro, after a point). The server keeps
       A for the toss; the ball is never live, so these are pure animation
+
+## Phase 13 — Serve variety
+- [x] Any face button tosses, and any face button strikes the serve
+- [x] The striking button picks the serve: A topspin (unchanged), B slice,
+      X drop (dies short — a lob serve would just be a free smash), Y flat
+- [x] AI mixes topspin/slice/flat serves (never a drop serve)
+- [x] Measured 8/8 legal serves per button with a clean depth spread:
+      X 2.1m (33% of the box), B 3.7m (58%), A 4.2m (66%), Y 5.0m (78%)
+- [x] Controls screen documents the serve buttons

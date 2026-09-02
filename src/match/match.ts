@@ -179,6 +179,37 @@ export class MatchController {
     this.ball.hold(new THREE.Vector3(p.x - 0.33 * this.server.dir, 1.25, p.z));
   }
 
+  /**
+   * Serve flavour per face button. `kind` feeds the solver its speed and net
+   * clearance; `depth` is where in the service box the ball lands, as a
+   * fraction of the service line, lerped by toss quality. X is a drop serve
+   * that dies just over the net rather than a lob — a lob serve would only
+   * ever be a free smash for the receiver.
+   */
+  private static readonly SERVE_STYLES: Record<'a' | 'b' | 'x' | 'y', {
+    kind: ShotKind; depth: [number, number]; power: number; spin: number; name: string;
+  }> = {
+    a: { kind: 'serve', depth: [0.50, 0.88], power: 1.00, spin: 1.0, name: 'TOPSPIN' },
+    b: { kind: 'slice', depth: [0.46, 0.80], power: 0.95, spin: 2.2, name: 'SLICE' },
+    // A drop serve cannot land right on top of the net: the ball crosses at
+    // ~90% of its flight when the target is that short, so it is already
+    // descending to the floor at the tape and clips it for a let. Landing a
+    // third of the way into the box still dies well short of a real serve.
+    x: { kind: 'drop',  depth: [0.34, 0.52], power: 0.95, spin: 0.6, name: 'DROP' },
+    y: { kind: 'flat',  depth: [0.58, 0.95], power: 1.08, spin: 0.4, name: 'FLAT' },
+  };
+
+  /** whichever face button went down this frame, if any */
+  private facePress(a: Actor): 'a' | 'b' | 'x' | 'y' | '' {
+    const p = a.pad;
+    if (!p) return '';
+    if (p.pressed('a')) return 'a';
+    if (p.pressed('b')) return 'b';
+    if (p.pressed('x')) return 'x';
+    if (p.pressed('y')) return 'y';
+    return '';
+  }
+
   private doToss(): void {
     this.tossActive = true;
     this.tossT = 0;
@@ -186,27 +217,31 @@ export class MatchController {
     this.deps.audio.sfx('serve_toss');
   }
 
-  private doServeHit(aimX: number): void {
+  private doServeHit(aimX: number, btn: 'a' | 'b' | 'x' | 'y' = 'a'): void {
+    const style = MatchController.SERVE_STYLES[btn];
     const apex = 0.47;
     const quality = 1 - Math.min(1, Math.abs(this.tossT - apex) / 0.3);
-    const isPower = quality > 0.72;
+    const isPower = quality > 0.72 && btn !== 'x';
     const sx = this.serveSideSign();
     const sDir = this.server.dir;
     const halfSingles = COURT.widthSingles / 2;
     // diagonal service box: x sign opposite the server's stance
     const bx = -sx * (halfSingles * 0.5 + aimX * -sx * halfSingles * 0.32);
-    const bz = -sDir * COURT.serviceLine * (0.5 + 0.38 * quality);
+    const depth = THREE.MathUtils.lerp(style.depth[0], style.depth[1], quality);
+    const bz = -sDir * COURT.serviceLine * depth;
     const from = new THREE.Vector3(this.server.pos.x, Math.max(1.9, 1.5 + this.tossY), this.server.pos.z);
     const target = new THREE.Vector3(THREE.MathUtils.clamp(bx, -halfSingles + 0.3, halfSingles - 0.3), 0.05, bz);
-    const power = this.server.powerMul * (0.82 + 0.38 * quality) * this.theme.ballSpeedMul;
-    const serveSpin = aimX * 0.4 * sx;
-    const solved = solveShot(from, target, 'serve', power, serveSpin);
+    const power = this.server.powerMul * (0.82 + 0.38 * quality) * this.theme.ballSpeedMul * style.power;
+    const serveSpin = aimX * 0.4 * sx * style.spin;
+    // the launch kind must match what the solver compensated for, or the
+    // magnus drift it corrected would put the ball somewhere else
+    const solved = solveShot(from, target, style.kind, power, serveSpin);
     this.server.avatar.serveHit(quality);
     this.tossActive = false;
     this.pending = null;
     // launch after the animation reaches contact
     this.schedule(SWING_CONTACT_DELAY, () => {
-      this.ball.launch(from, solved.vel, 'serve', serveSpin);
+      this.ball.launch(from, solved.vel, style.kind, serveSpin);
       this.lastHitTeam = this.scorer.servingTeam;
       this.rallyHits = 0;
       this.phase = 'serveFlight';
@@ -659,7 +694,7 @@ export class MatchController {
       }
       this.holdBallAtServer();
       if (isHuman) {
-        if (this.server.pad?.pressed('a')) this.doToss();
+        if (this.facePress(this.server)) this.doToss();
       } else {
         const brain = this.brains.get(this.server)!;
         if (brain.serveTick(dt, 0, false) === 'toss') this.doToss();
@@ -681,12 +716,16 @@ export class MatchController {
         return;
       }
       if (isHuman) {
-        if (this.server.pad?.pressed('a')) {
-          this.doServeHit(this.server.pad.moveX * this.viewSign(this.server));
+        const btn = this.facePress(this.server);
+        if (btn) {
+          this.doServeHit(this.server.pad!.moveX * this.viewSign(this.server), btn);
         }
       } else {
         const brain = this.brains.get(this.server)!;
-        if (brain.serveTick(dt, this.tossT, true) === 'hit') this.doServeHit(brain.serveAimX);
+        if (brain.serveTick(dt, this.tossT, true) === 'hit') {
+          const r = Math.random();
+          this.doServeHit(brain.serveAimX, r < 0.6 ? 'a' : r < 0.85 ? 'b' : 'y');
+        }
       }
     }
     // non-serving actors may shuffle around

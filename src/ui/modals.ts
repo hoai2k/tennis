@@ -248,7 +248,8 @@ export function createInstructionsModal(ctx: UiCtx, close: () => void): Modal {
     ['Hold LB', 'SPRINT — steer freely, swing any time'],
     ['Hold early', 'CHARGE the shot for extra power'],
     ['Swing from a ⭐', 'STAR SHOT!'],
-    ['Serve', 'A to toss · A again at the peak = power serve'],
+    ['Serve', 'Any button tosses · press again at the peak = power'],
+    ['Serve type', 'A topspin · B slice · X drop · Y flat'],
   ];
   for (const [k, v] of tipData) {
     const t = div('cc-instr-tip');
