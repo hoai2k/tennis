@@ -32,7 +32,8 @@ interface HumanCursor {
 
 export interface CharSelectApi extends Screen {
   start(activePads: number[], mode: 'singles' | 'doubles'): void;
-  padJoined(padIndex: number): void;
+  /** returns false if the screen can't take the pad (full, or already locked) */
+  padJoined(padIndex: number): boolean;
 }
 
 export function createCharSelect(ctx: UiCtx): CharSelectApi {
@@ -278,8 +279,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
   function slotLabels(): { label: string; color: string; human: boolean; pad?: number }[] {
     const out: { label: string; color: string; human: boolean; pad?: number }[] = [];
     humans.forEach((h, i) => {
-      out.push({ label: `P${h.pad + 1}`, color: PAD_COLORS[h.pad] ?? '#fff', human: true, pad: h.pad });
-      void i;
+      out.push({ label: `P${i + 1}`, color: PAD_COLORS[i] ?? '#fff', human: true, pad: h.pad });
     });
     for (let i = humans.length; i < totalSlots; i++) {
       out.push({ label: `CPU ${i - humans.length + 1}`, color: CPU_COLOR, human: false });
@@ -489,11 +489,22 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       pad,
       grid: startGrid,
       locked: false,
-      el: makeCursorEl(`P${pad + 1}`, PAD_COLORS[pad] ?? '#fff', pad),
+      el: makeCursorEl('', '#fff', pad),
     };
     humans.push(cur);
     humans.sort((a, b) => a.pad - b.pad);
+    relabelHumans();
     placeCursor(cur.el, startGrid);
+  }
+
+  /** Players are numbered by seat, not by pad index — a lone player whose
+   *  controller the browser handed index 1 is still P1. */
+  function relabelHumans(): void {
+    humans.forEach((h, i) => {
+      h.el.style.setProperty('--cursor-color', PAD_COLORS[i] ?? '#fff');
+      const tag = h.el.querySelector('.cc-cursor-tag');
+      if (tag) tag.textContent = `P${i + 1}`;
+    });
   }
 
   return {
@@ -520,10 +531,10 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       }
     },
 
-    padJoined(padIndex: number) {
-      if (phase === 'done') return;
-      if (humans.some((h) => h.pad === padIndex)) return;
-      if (humans.length >= totalSlots) return;
+    padJoined(padIndex: number): boolean {
+      if (phase === 'done') return false;
+      if (humans.some((h) => h.pad === padIndex)) return false;
+      if (humans.length >= totalSlots) return false;
       // a new human invalidates any CPU picking in progress
       if (phase === 'cpu') {
         phase = 'humans';
@@ -533,6 +544,7 @@ export function createCharSelect(ctx: UiCtx): CharSelectApi {
       addHuman(padIndex, RANDOM_IDX);
       ctx.sfx('menu_confirm');
       refreshSlots();
+      return true;
     },
 
     handleMenu(action: MenuAction, padIndex: number) {

@@ -48,6 +48,10 @@ let state: AppState = 'title';
 let chosenMode: 'singles' | 'doubles' = 'singles';
 let pendingSlots: { characterId: CharacterId; control: ControlSource }[] = [];
 let activePads: number[] = [];
+/** the pad currently driving the menus — the player who reaches the roster
+ *  screen. Everyone else joins by pressing something once they get there.
+ *  -1 until a controller is actually used. */
+let menuPad = -1;
 let stadium = createStadium('shibuya', 'full');
 scene.add(stadium.group);
 let match: MatchController | null = null;
@@ -67,10 +71,11 @@ const ui: UiApi = createUI(uiRoot, {
   onModeChosen(mode) {
     chosenMode = mode;
     state = 'chars';
-    activePads = input.connectedPads();
-    if (activePads.length === 0) activePads = [0];
-    if (mode === 'singles') activePads = activePads.slice(0, 2);
-    else activePads = activePads.slice(0, 4);
+    // A controller that is merely plugged in is not a player. Only the pad
+    // that walked the menus here gets a slot; a second pad joins by pressing
+    // something on the roster screen (see joinPad), and until it does this is
+    // a one-player game against the CPU.
+    activePads = [menuPad >= 0 ? menuPad : input.firstConnectedPad()];
     ui.showCharacterSelect(activePads, mode);
   },
   onCharactersConfirmed(slots) {
@@ -150,13 +155,22 @@ input.onMenuAction((action, pad) => {
     else if (match?.paused) ui.handleMenu(action, pad);
     return;
   }
-  if (state === 'chars' && !activePads.includes(pad)) {
-    activePads.push(pad);
-    ui.padJoined(pad);
-    return;
-  }
+  menuPad = pad;
+  // an unjoined pad's first input on the roster screen buys it in, and is
+  // swallowed: it must not also count as that player's confirm
+  if (state === 'chars' && action !== 'back' && joinPad(pad)) return;
   ui.handleMenu(action, pad);
 });
+
+/** Bring `pad` into the game if it isn't already in. Returns true if it just
+ *  joined. The roster screen caps the count and draws the new selector. */
+function joinPad(pad: number): boolean {
+  if (activePads.includes(pad)) return false;
+  if (activePads.length >= (chosenMode === 'singles' ? 2 : 4)) return false;
+  if (!ui.padJoined(pad)) return false;
+  activePads.push(pad);
+  return true;
+}
 
 // ---------- match lifecycle ----------
 
@@ -453,6 +467,12 @@ function frame(now: number): void {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   input.update(dt);
+
+  // X/Y/triggers emit no menu action, but they are still "a button" to a
+  // player mashing to get in, so they join too.
+  if (state === 'chars') {
+    for (let i = 0; i < 4; i++) if (!activePads.includes(i) && input.joinPressed(i)) joinPad(i);
+  }
 
   if (state === 'match' || state === 'victory') {
     match?.update(dt);

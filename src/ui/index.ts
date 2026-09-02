@@ -48,7 +48,8 @@ export interface UiApi {
   showMainMenu(): void;
   showCharacterSelect(activePads: number[], mode: 'singles' | 'doubles'): void;
   /** notify UI a pad joined later (pressed a button while in char select) */
-  padJoined(padIndex: number): void;
+  /** a controller buying into the roster screen; false if it can't be taken */
+  padJoined(padIndex: number): boolean;
   showCourtSelect(themes: CourtThemeDef[], showTeamOption: boolean): void;
   showMatchHud(teams: [TeamInfo, TeamInfo]): void;
   hideAll(): void;
@@ -313,7 +314,7 @@ export function createUI(root: HTMLElement, cb: UiCallbacks, initial: GameSettin
     },
 
     padJoined(padIndex: number) {
-      charSelect.padJoined(padIndex);
+      return charSelect.padJoined(padIndex);
     },
 
     showCourtSelect(themes: CourtThemeDef[], showTeamOption: boolean) {

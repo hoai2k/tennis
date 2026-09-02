@@ -212,3 +212,22 @@ Status legend: [ ] todo · [~] in progress · [x] done
       mechs, worst-case body movement under 0.01 H, arm motion unchanged
       (duelist 0.1980 → 0.1976). Cost 7-100 ms per model on the warm path
 - [x] `/skinaudit.html` dev harness to check future model drops
+
+## Phase 15 — Controllers join by pressing, not by being plugged in
+- [x] Every connected pad used to be seated as a player the moment a mode was
+      chosen (`connectedPads()`), so a second controller lying idle on the
+      table forced a two-player game and there was no way to play alone
+      against the CPU. Only the pad that confirms the mode is seated now; any
+      other joins by pressing something on the roster screen, which the
+      screen already handled (`padJoined`) but never saw
+- [x] Joining accepts any button except B (back/cancel) — including X/Y and the
+      triggers, which emit no menu action — and never stick movement, so a
+      drifting stick can't add a player
+- [x] `padJoined` reports whether the roster screen took the pad, so a press
+      arriving as the roster locks can't desync the two lists
+- [x] Players are numbered and coloured by seat, not pad index: a lone player
+      whose controller the browser handed index 1 was labelled "P2"
+- [x] Verified against fake gamepads: idle 2nd pad → 1 human + 1 CPU (singles)
+      and 1 human + 3 CPU (doubles), no split view; after it presses → 2
+      humans, split view in singles; keyboard-only and pad-on-index-1 both
+      seat a single P1

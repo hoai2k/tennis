@@ -80,7 +80,6 @@ export class InputManager {
   private keyHeld = new Set<PadButton>();
   private menuListeners: ((action: MenuAction, padIndex: number) => void)[] = [];
   private repeats: (RepeatState | null)[] = [null, null, null, null];
-  private everSeen = [false, false, false, false];
   private keyboardUsed = false;
 
   constructor(rumbleEnabled: () => boolean) {
@@ -117,11 +116,24 @@ export class InputManager {
     this.menuListeners.push(cb);
   }
 
-  /** pads currently connected (incl. keyboard-as-pad-0 once used) */
-  connectedPads(): number[] {
-    const out: number[] = [];
-    for (let i = 0; i < 4; i++) if (this.pads[i].connected || this.everSeen[i]) out.push(i);
-    return out;
+  /** Buttons that read as "put me in the game". `b` is back/cancel so it never
+   *  joins anyone, and stick movement is not a press at all — a controller
+   *  sitting on the table, however far its sticks have drifted, must never
+   *  become a second player. */
+  private static readonly JOIN_BUTTONS: PadButton[] =
+    ['a', 'x', 'y', 'lb', 'rb', 'lt', 'rt', 'start', 'up', 'down', 'left', 'right'];
+
+  /** true on the frame this pad presses something that counts as joining */
+  joinPressed(i: number): boolean {
+    return InputManager.JOIN_BUTTONS.some((b) => this.pads[i].pressed(b));
+  }
+
+  /** Lowest connected pad, or 0. Only a fallback for seating player one when
+   *  nobody has touched a controller yet (the menus were clicked through) —
+   *  browsers do not always hand the only pad index 0. */
+  firstConnectedPad(): number {
+    for (let i = 0; i < 4; i++) if (this.pads[i].connected) return i;
+    return 0;
   }
 
   /** any button pressed this frame on any pad → pad index, else -1 */
@@ -146,7 +158,6 @@ export class InputManager {
         };
       }
       this.pads[i]._update(gp, isKb ? this.keyHeld : null, ks);
-      if (this.pads[i].connected) this.everSeen[i] = true;
       this.emitMenu(i, dt);
     }
   }
