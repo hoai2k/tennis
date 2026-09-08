@@ -43,6 +43,16 @@
       <div id="fake-court"></div>
       <div id="ui-root"></div>
     </div>
-    <script type="module" src="/src/ui/devTest.ts"></script>
+    <!-- The door first, then this tool. Off on localhost, so `npm run dev`
+         never meets it; see src/gate/gate.js. -->
+    <script type="module">
+      import { openGate } from "/src/gate/gate.js";
+      await openGate({
+        title: "Tennis — UI test",
+        blurb: "This game is for friends of Hoai Nguyen. Use your invite link, or enter your code below.",
+        game: "tennis-uitest",
+      });
+      await import("/src/ui/devTest.ts");
+    </script>
   </body>
 </html>
