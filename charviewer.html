@@ -20,6 +20,16 @@
     <div id="view"></div>
     <div id="info"></div>
     <div id="buttons"></div>
-    <script type="module" src="/src/characters/devViewer.ts"></script>
+    <!-- The door first, then this tool. Off on localhost, so `npm run dev`
+         never meets it; see src/gate/gate.js. -->
+    <script type="module">
+      import { openGate } from "/src/gate/gate.js";
+      await openGate({
+        title: "Tennis — characters",
+        blurb: "This game is for friends of Hoai Nguyen. Use your invite link, or enter your code below.",
+        game: "tennis-charviewer",
+      });
+      await import("/src/characters/devViewer.ts");
+    </script>
   </body>
 </html>

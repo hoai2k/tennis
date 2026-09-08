@@ -7,5 +7,15 @@
     <code>await __skinAudit('models/tusken.glb', {fix:true})</code> ·
     <code>await __skinProbe('models/tusken.glb')</code> ·
     <code>await __skinShot('models/tusken.glb')</code></p>
-  <script type="module" src="/src/characters/skinAudit.ts"></script>
+    <!-- The door first, then this tool. Off on localhost, so `npm run dev`
+         never meets it; see src/gate/gate.js. -->
+    <script type="module">
+      import { openGate } from "/src/gate/gate.js";
+      await openGate({
+        title: "Tennis — skin audit",
+        blurb: "This game is for friends of Hoai Nguyen. Use your invite link, or enter your code below.",
+        game: "tennis-skinaudit",
+      });
+      await import("/src/characters/skinAudit.ts");
+    </script>
 </body>
